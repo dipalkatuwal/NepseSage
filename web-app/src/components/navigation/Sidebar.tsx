@@ -21,7 +21,7 @@ import { navItems } from "./nav-data";
 export function AppSidebar() {
   const pathname = usePathname();
   const { state } = useSidebar();
-  const { isAuthenticated, logout } = useAuth();
+  const { isAuthenticated, isGuest, logout } = useAuth();
 
   return (
     <Sidebar collapsible="icon" className="border-r border-border bg-sidebar">
@@ -46,8 +46,9 @@ export function AppSidebar() {
               pathname === item.to ||
               (item.to !== "/" && pathname.startsWith(item.to));
 
-            const isGated = ["/journal", "/sage-ai", "/simulator", "/settings"].includes(item.to);
-            const showLock = isGated && !isAuthenticated;
+            // Lock everything for guests since they only access /market (Top Nav)
+            const isLocked = isGuest || (!isAuthenticated && ["/journal", "/sage-ai", "/simulator", "/settings"].includes(item.to));
+            const showLock = isLocked;
 
             return (
               <SidebarMenuItem key={item.to}>
@@ -55,15 +56,24 @@ export function AppSidebar() {
                   asChild
                   isActive={isActive}
                   tooltip={item.label}
-                  className={`nav-item ${isActive ? "nav-item-active" : ""} border-none h-10`}
+                  className={`nav-item ${isActive ? "nav-item-active" : ""} border-none h-10 ${isLocked ? "opacity-50 grayscale pointer-events-none" : ""}`}
                 >
-                  <Link href={item.to} className="flex items-center justify-between w-full">
-                    <div className="flex items-center gap-2">
-                      <item.icon className="h-4 w-4 shrink-0" />
-                      <span>{item.label}</span>
+                  {isLocked ? (
+                    <div className="flex items-center justify-between w-full px-2">
+                      <div className="flex items-center gap-2">
+                        <item.icon className="h-4 w-4 shrink-0" />
+                        <span>{item.label}</span>
+                      </div>
+                      <Lock className="h-3 w-3 text-muted-foreground/50" />
                     </div>
-                    {showLock && <Lock className="h-3 w-3 text-muted-foreground/50" />}
-                  </Link>
+                  ) : (
+                    <Link href={item.to} className="flex items-center justify-between w-full">
+                      <div className="flex items-center gap-2">
+                        <item.icon className="h-4 w-4 shrink-0" />
+                        <span>{item.label}</span>
+                      </div>
+                    </Link>
+                  )}
                 </SidebarMenuButton>
               </SidebarMenuItem>
             );

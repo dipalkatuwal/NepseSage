@@ -30,7 +30,7 @@ const FEATURE_PILLS = [
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login } = useAuth();
+  const { login, loginAsGuest } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -289,9 +289,12 @@ export default function LoginPage() {
           </div>
 
           {/* Guest CTA */}
-          <Link href="/" className="auth-btn-ghost w-full block text-center">
+          <button 
+            onClick={loginAsGuest}
+            className="auth-btn-ghost w-full block text-center"
+          >
             Continue as Guest
-          </Link>
+          </button>
 
           {/* Sign up link */}
           <p className="mt-6 text-center text-sm text-muted-foreground">

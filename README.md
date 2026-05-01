@@ -1,15 +1,16 @@
 # NEPSE Sage AI 🇳🇵
 
-**NEPSE Sage AI** is a professional-grade clinical analysis platform for the Nepal Stock Exchange. It transforms raw market data into high-precision visual intelligence, combining institutional-grade UI with advanced AI behavioral insights.
+**NEPSE Sage AI** is a professional-grade clinical analysis platform for the Nepal Stock Exchange. It transforms raw market data into high-precision visual intelligence, combining an institutional-grade UI with advanced AI behavioral insights.
 
 ---
 
 ## 🏛️ Architecture & Context
-This project is a high-performance **Next.js 15 (App Router)** application, migrated from TanStack Start for superior SEO, edge compatibility, and developer velocity. It is designed with a **"Clinical Analyst"** philosophy: high-density data, zero-latency interactions, and a professional navy aesthetic.
+
+NEPSE Sage AI has evolved into a full-stack **MERN-like** architecture, utilizing **Next.js 15 (App Router)** for the frontend and an **Express.js / Node.js** server for the backend, powered by **MongoDB**. It is designed with a **"Clinical Analyst"** philosophy: high-density data, zero-latency interactions, and a professional navy aesthetic.
 
 ### 🧠 Core Intelligence
 - **Behavioral Analysis**: Tracks "Discipline Scores" and identifies cognitive biases (FOMO, Revenge Trading) via the Journal.
-- **AI Engine**: A specialized interface for symbol analysis (e.g., NICA, NTC) and sentiment aggregation.
+- **AI Engine**: A specialized interface for symbol analysis (e.g., NICA, NTC) and sentiment aggregation using OpenAI.
 - **Data Density**: UI is optimized for professional utility, using Space Grotesk for readability and DM Sans for dense data.
 
 ---
@@ -39,39 +40,53 @@ The trading psychologist.
 
 ## 🛠️ Technical Stack & Primitives
 
+### Frontend (`/web-app`)
 - **Framework**: Next.js 15 (App Router, Server Components)
 - **Styling**: Tailwind CSS 4 + Shadcn UI (Radix UI)
 - **Visuals**: Framer Motion (Micro-interactions) + Recharts (Financial charts)
 - **Type Safety**: Zod (Schema validation) + TypeScript (Strict mode)
-- **Deployment**: Optimized for Cloudflare Workers/Pages (Wrangler)
+
+### Backend (`/server`)
+- **Runtime**: Node.js with Express.js
+- **Database**: MongoDB (Mongoose 9 ODM)
+- **Authentication**: JWT (JSON Web Tokens) & Bcryptjs for secure password hashing
+- **AI Integration**: OpenAI SDK for market sentiment and analysis
+- **Task Scheduling**: Node-cron for background jobs
 
 ---
 
 ## 📁 Developer Guide: Project Structure
 
+The project is structured as a monorepo containing both the frontend and backend.
+
 ```text
-/src
-  /app
-    /(dashboard)      # Authenticated routes & main layout
-      /insights       # Market sentiment & AI community signals
-      /journal        # Behavioral tracking (The "Psychologist")
-      /sage-ai        # AI LLM interface (The "Analyst")
-      /simulator      # Virtual trading logic
-      layout.tsx      # Sidebar & State management (SidebarProvider)
-      page.tsx        # Dashboard entry point
-    globals.css       # Design system (OKLCH colors, clinical variables)
-  /components
-    /ui               # Atomic Shadcn components (customized)
-    AppLayout.tsx     # Shell structure & navigation logic
-  /lib
-    /utils.ts         # Tailwind merging & shared helpers
-  /hooks
-    /use-mobile.tsx   # Responsive breakpoint management
+/
+├── server/                 # Express.js Backend
+│   ├── src/
+│   │   ├── config/         # Environment and DB configuration
+│   │   ├── controllers/    # Route logic and request handling
+│   │   ├── middleware/     # Custom middlewares (auth, error handling)
+│   │   ├── models/         # Mongoose schemas (User, Portfolio, Journal)
+│   │   ├── routes/         # API endpoint definitions
+│   │   ├── services/       # Core business logic and external API integrations
+│   │   ├── utils/          # Helper functions
+│   │   └── app.js          # Express app entry point
+│   └── package.json        # Backend dependencies
+│
+└── web-app/                # Next.js 15 Frontend
+    ├── src/
+    │   ├── app/            # Next.js App Router (pages & layouts)
+    │   ├── components/     # Reusable UI components (Shadcn, AppLayout)
+    │   ├── context/        # React Context providers (AuthContext)
+    │   ├── hooks/          # Custom React hooks (use-mobile)
+    │   └── lib/            # Utilities (Tailwind merging, API clients)
+    └── package.json        # Frontend dependencies
 ```
 
 ---
 
 ## 🎨 Design Language (Clinical Navy)
+
 The design system enforces a premium, anti-generic UI:
 - **Calibrated Color**: OKLCH-based colors for perfect light/dark mode transitions.
 - **Micro-Motion**: Hardware-accelerated transitions via Framer Motion.
@@ -81,13 +96,31 @@ The design system enforces a premium, anti-generic UI:
 
 ## ⚙️ Development Workflow
 
-1. **Setup**: `npm install`
-2. **Local Dev**: `npm run dev` (Port 3000)
-3. **Build**: `npm run build` (Static/Edge optimization)
+To run the full stack locally, you need two terminal instances.
+
+### 1. Start the Backend Server
+```bash
+cd server
+npm install
+npm run dev
+```
+*The server will run on port 5000 (or the port defined in `.env`).*
+
+### 2. Start the Frontend Application
+```bash
+cd web-app
+npm install
+npm run dev
+```
+*The web app will run on port 3000.*
+
+### Environment Variables
+You will need `.env` files in both directories.
+- **`/server/.env`**: Needs `MONGO_URI`, `JWT_SECRET`, `PORT`, and `OPENAI_API_KEY`.
+- **`/web-app/.env.local`**: Needs `NEXT_PUBLIC_API_URL` pointing to the backend (e.g., `http://localhost:5000/api`).
 
 ---
 
 ## 📝 Usage for AI Tools
 If pasting this into another AI for development:
-> "This is a Next.js 15 App Router project using Shadcn UI and Tailwind 4. The project follows a 'Clinical Analyst' aesthetic. Key files include `AppLayout.tsx` for layout and `globals.css` for the theme. Prioritize performance, data density, and Space Grotesk typography in all UI changes."
-
+> "This is a full-stack Next.js 15 (App Router) and Express.js project using MongoDB. The frontend uses Shadcn UI, Tailwind 4, and follows a 'Clinical Analyst' aesthetic with Space Grotesk typography. The backend handles JWT authentication, portfolio management, and journal entries. Prioritize performance, data density, and secure API integration between the Next.js frontend and Express backend."

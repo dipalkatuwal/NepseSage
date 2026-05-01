@@ -15,7 +15,7 @@ const BENEFITS = [
 
 export default function SignupPage() {
   const router = useRouter();
-  const { signup } = useAuth();
+  const { signup, loginAsGuest } = useAuth();
 
   const [form, setForm] = useState({
     name: "",
@@ -321,6 +321,21 @@ export default function SignupPage() {
               Sign in
             </Link>
           </p>
+
+          {/* Divider */}
+          <div className="my-6 flex items-center gap-3">
+            <div className="flex-1 h-px bg-border" />
+            <span className="text-xs text-muted-foreground">or</span>
+            <div className="flex-1 h-px bg-border" />
+          </div>
+
+          {/* Guest CTA */}
+          <button 
+            onClick={loginAsGuest}
+            className="auth-btn-ghost w-full block text-center"
+          >
+            Continue as Guest
+          </button>
         </div>
       </div>
     </div>

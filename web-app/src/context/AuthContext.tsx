@@ -1,7 +1,14 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+} from "react";
 import { useRouter } from "next/navigation";
+import { authAPI, type BackendUser } from "@/lib/services";
 
 export interface AuthUser {
   id: string;
@@ -11,28 +18,44 @@ export interface AuthUser {
   plan: "free" | "pro";
   joinedAt: string;
   onboarded: boolean;
+  disciplineScore?: number;
+  riskTolerance?: string;
+  watchlist?: string[];
   profile?: {
     experience: "beginner" | "intermediate" | "expert";
     sectors: string[];
-    watchlist: string[];
   };
 }
 
 interface AuthContextValue {
   user: AuthUser | null;
   isAuthenticated: boolean;
+  isGuest: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  signup: (name: string, email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  login: (
+    email: string,
+    password: string
+  ) => Promise<{ success: boolean; error?: string }>;
+  signup: (
+    name: string,
+    email: string,
+    password: string
+  ) => Promise<{ success: boolean; error?: string }>;
+  loginAsGuest: () => void;
   logout: () => void;
   completeOnboarding: (profile: AuthUser["profile"]) => void;
   updateUser: (updates: Partial<AuthUser>) => void;
+  updateProfileAPI: (updates: {
+    name?: string;
+    tradingGoal?: string;
+    riskTolerance?: string;
+    watchlist?: string[];
+  }) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
-
-const STORAGE_KEY = "nepsesage_auth";
-const USERS_KEY = "nepsesage_users";
+const TOKEN_KEY = "nepsesage_token";
+const SESSION_KEY = "nepsesage_auth";
 
 function getInitials(name: string): string {
   return name
@@ -43,23 +66,25 @@ function getInitials(name: string): string {
     .slice(0, 2);
 }
 
-function loadUsers(): Record<string, { passwordHash: string; user: AuthUser }> {
-  if (typeof window === "undefined") return {};
-  try {
-    return JSON.parse(localStorage.getItem(USERS_KEY) || "{}");
-  } catch {
-    return {};
-  }
-}
-
-function saveUsers(users: Record<string, { passwordHash: string; user: AuthUser }>) {
-  localStorage.setItem(USERS_KEY, JSON.stringify(users));
+function mapBackendUser(data: BackendUser): AuthUser {
+  return {
+    id: data._id,
+    name: data.name,
+    email: data.email,
+    avatarInitials: getInitials(data.name),
+    plan: "free",
+    joinedAt: new Date().toISOString(),
+    onboarded: true,
+    disciplineScore: data.disciplineScore,
+    riskTolerance: data.riskTolerance,
+    watchlist: data.watchlist || [],
+  };
 }
 
 function loadSession(): AuthUser | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(SESSION_KEY);
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
@@ -67,71 +92,136 @@ function loadSession(): AuthUser | null {
 }
 
 function saveSession(user: AuthUser | null) {
+  if (typeof window === "undefined") return;
   if (user) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+    localStorage.setItem(SESSION_KEY, JSON.stringify(user));
   } else {
-    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(TOKEN_KEY);
   }
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [isGuest, setIsGuest] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Hydrate session: validate token with backend on mount
   useEffect(() => {
     const session = loadSession();
-    setUser(session);
-    setIsLoading(false);
+    if (session?.email === "guest@nepsesage.com") {
+      setUser(session);
+      setIsGuest(true);
+      setIsLoading(false);
+      return;
+    }
+
+    const token = typeof window !== "undefined"
+      ? localStorage.getItem(TOKEN_KEY)
+      : null;
+
+    if (!token) {
+      // No token at all — clear any stale session data and mark as loaded
+      if (typeof window !== "undefined") {
+        localStorage.removeItem(SESSION_KEY);
+      }
+      setUser(null);
+      setIsGuest(false);
+      setIsLoading(false);
+      return;
+    }
+
+    // Token exists — verify it with the backend
+    authAPI.getMe()
+      .then((data) => {
+        const authUser = mapBackendUser(data);
+        saveSession(authUser);
+        setUser(authUser);
+        setIsGuest(false);
+      })
+      .catch(() => {
+        // Token is invalid/expired — clear everything
+        localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem(SESSION_KEY);
+        setUser(null);
+      })
+      .finally(() => setIsLoading(false));
   }, []);
 
   const login = useCallback(
-    async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
-      await new Promise((r) => setTimeout(r, 600)); // Simulate network
-      const users = loadUsers();
-      const entry = users[email.toLowerCase()];
-      if (!entry) {
-        return { success: false, error: "No account found with this email." };
+    async (
+      email: string,
+      password: string
+    ): Promise<{ success: boolean; error?: string }> => {
+      try {
+        const data = await authAPI.login(email, password);
+        // Store JWT
+        if (data.token) {
+          localStorage.setItem(TOKEN_KEY, data.token);
+        }
+        const authUser = mapBackendUser(data);
+        saveSession(authUser);
+        setUser(authUser);
+        setIsGuest(false);
+        return { success: true };
+      } catch (err: unknown) {
+        const msg =
+          (err as { response?: { data?: { message?: string } } })?.response
+            ?.data?.message || "Login failed. Please try again.";
+        return { success: false, error: msg };
       }
-      // Simple hash check (in prod, use bcrypt on server)
-      if (entry.passwordHash !== btoa(password)) {
-        return { success: false, error: "Incorrect password." };
-      }
-      saveSession(entry.user);
-      setUser(entry.user);
-      return { success: true };
     },
     []
   );
 
   const signup = useCallback(
-    async (name: string, email: string, password: string): Promise<{ success: boolean; error?: string }> => {
-      await new Promise((r) => setTimeout(r, 700)); // Simulate network
-      const users = loadUsers();
-      if (users[email.toLowerCase()]) {
-        return { success: false, error: "An account with this email already exists." };
+    async (
+      name: string,
+      email: string,
+      password: string
+    ): Promise<{ success: boolean; error?: string }> => {
+      try {
+        const data = await authAPI.register(name, email, password);
+        if (data.token) {
+          localStorage.setItem(TOKEN_KEY, data.token);
+        }
+        const authUser = { ...mapBackendUser(data), onboarded: false };
+        saveSession(authUser);
+        setUser(authUser);
+        setIsGuest(false);
+        return { success: true };
+      } catch (err: unknown) {
+        const msg =
+          (err as { response?: { data?: { message?: string } } })?.response
+            ?.data?.message || "Sign up failed. Please try again.";
+        return { success: false, error: msg };
       }
-      const newUser: AuthUser = {
-        id: crypto.randomUUID(),
-        name: name.trim(),
-        email: email.toLowerCase().trim(),
-        avatarInitials: getInitials(name),
-        plan: "free",
-        joinedAt: new Date().toISOString(),
-        onboarded: false,
-      };
-      users[email.toLowerCase()] = { passwordHash: btoa(password), user: newUser };
-      saveUsers(users);
-      saveSession(newUser);
-      setUser(newUser);
-      return { success: true };
     },
     []
   );
 
+  const loginAsGuest = useCallback(() => {
+    const guestUser: AuthUser = {
+      id: "guest",
+      name: "Guest User",
+      email: "guest@nepsesage.com",
+      avatarInitials: "GU",
+      plan: "free",
+      joinedAt: new Date().toISOString(),
+      onboarded: true,
+      watchlist: [],
+    };
+    saveSession(guestUser);
+    setUser(guestUser);
+    setIsGuest(true);
+    router.push("/market");
+  }, [router]);
+
   const logout = useCallback(() => {
     saveSession(null);
     setUser(null);
+    setIsGuest(false);
     router.push("/login");
   }, [router]);
 
@@ -139,12 +229,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     (profile: AuthUser["profile"]) => {
       if (!user) return;
       const updated = { ...user, onboarded: true, profile };
-      // Update in users store too
-      const users = loadUsers();
-      if (users[user.email]) {
-        users[user.email].user = updated;
-        saveUsers(users);
-      }
       saveSession(updated);
       setUser(updated);
     },
@@ -155,13 +239,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     (updates: Partial<AuthUser>) => {
       if (!user) return;
       const updated = { ...user, ...updates };
-      const users = loadUsers();
-      if (users[user.email]) {
-        users[user.email].user = updated;
-        saveUsers(users);
-      }
       saveSession(updated);
       setUser(updated);
+    },
+    [user]
+  );
+
+  const updateProfileAPI = useCallback(
+    async (updates: {
+      name?: string;
+      tradingGoal?: string;
+      riskTolerance?: string;
+      watchlist?: string[];
+    }) => {
+      if (!user) throw new Error("Authentication required");
+      try {
+        const data = await authAPI.updateProfile(updates);
+        const authUser = { ...user, ...mapBackendUser(data) };
+        saveSession(authUser);
+        setUser(authUser);
+      } catch (err) {
+        console.error("Failed to update profile", err);
+        throw err;
+      }
     },
     [user]
   );
@@ -170,13 +270,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     <AuthContext.Provider
       value={{
         user,
-        isAuthenticated: !!user,
+        isAuthenticated: !!user && !isGuest,
+        isGuest,
         isLoading,
         login,
         signup,
+        loginAsGuest,
         logout,
         completeOnboarding,
         updateUser,
+        updateProfileAPI,
       }}
     >
       {children}

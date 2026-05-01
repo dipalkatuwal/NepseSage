@@ -1,5 +1,6 @@
 "use client";
 
+import { useJournal } from "@/hooks/useJournal";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthGuard } from "@/components/shared/AuthGuard";
 import { BehavioralEngine } from "@/components/journal/BehavioralEngine";
@@ -8,6 +9,8 @@ import { DisciplineHeatMap } from "@/components/journal/DisciplineHeatMap";
 import { TradeJournalTable } from "@/components/journal/TradeJournalTable";
 
 export default function JournalClient() {
+  const { entries, loading, createEntry, deleteEntry, fetchEntries } = useJournal();
+
   return (
     <AuthGuard
       featureName="Behavior Lab"
@@ -25,7 +28,13 @@ export default function JournalClient() {
         </div>
 
         <DisciplineHeatMap />
-        <TradeJournalTable />
+        <TradeJournalTable
+          entries={entries}
+          loading={loading}
+          deleteEntry={deleteEntry}
+          createEntry={createEntry}
+          onEntryCreated={fetchEntries}
+        />
       </TooltipProvider>
     </AuthGuard>
   );

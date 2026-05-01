@@ -41,7 +41,7 @@ export function Navbar() {
             NEPSE Sage AI
           </span>
         )}
-        
+
         <GlobalSearch onExpandChange={setIsSearchExpanded} />
       </div>
 
@@ -49,25 +49,18 @@ export function Navbar() {
         <div className="flex items-center gap-1 md:gap-2">
           <nav className="hidden items-center gap-1 xl:flex">
             <Link
-              href="/"
-              className={`rounded px-3 py-1.5 text-xs font-medium transition hover:text-foreground ${pathname === "/" ? "text-primary" : "text-muted-foreground"}`}
+              href="/market"
+              className={`rounded px-3 py-1.5 text-xs font-medium transition hover:text-foreground ${pathname === "/market" ? "text-primary" : "text-muted-foreground"}`}
             >
               Market
             </Link>
-            <span className="rounded px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:text-foreground cursor-pointer">
-              Sectors
-            </span>
-            <Link
-              href="/insights"
-              className={`rounded px-3 py-1.5 text-xs font-medium transition hover:text-foreground ${pathname === "/insights" ? "text-primary underline underline-offset-4" : "text-muted-foreground"}`}
-            >
-              Analysis
-            </Link>
+
+
           </nav>
-          
+
           <div className="ml-2 flex items-center gap-1 md:gap-3">
             {!isLoading && isAuthenticated && <NotificationSheet />}
-            
+
             <Button
               variant="ghost"
               size="icon"
@@ -94,8 +87,12 @@ export function Navbar() {
                 <DropdownMenuContent className="w-56" align="end" forceMount>
                   <DropdownMenuLabel className="font-normal">
                     <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-bold leading-none font-heading">{user?.name}</p>
-                      <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
+                      <p className="text-sm font-bold leading-none font-heading">
+                        {user?.name}
+                      </p>
+                      <p className="text-xs leading-none text-muted-foreground">
+                        {user?.email}
+                      </p>
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />

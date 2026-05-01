@@ -1,14 +1,17 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/navigation/Sidebar";
 import { Navbar } from "@/components/navigation/Navbar";
 import { Footer } from "@/components/navigation/Footer";
+import { useAuth } from "@/context/AuthContext";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { user, isAuthenticated, isGuest, isLoading } = useAuth();
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
 
   // Avoid hydration mismatch
@@ -16,7 +19,24 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     setMounted(true);
   }, []);
 
-  if (!mounted) {
+  // Protect dashboard routes
+  useEffect(() => {
+    if (!mounted || isLoading) return;
+
+    if (!isAuthenticated && !isGuest) {
+      // Not logged in and not a guest -> login
+      router.push("/login");
+    } else if (isGuest && pathname !== "/market") {
+      // Guest can ONLY see /market
+      router.push("/market");
+    }
+  }, [mounted, isLoading, isAuthenticated, isGuest, pathname, router]);
+
+  if (!mounted || isLoading) {
+    return null;
+  }
+
+  if (!isAuthenticated && !isGuest) {
     return null;
   }
 
