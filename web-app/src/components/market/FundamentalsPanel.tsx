@@ -8,15 +8,19 @@ import { Building2, TrendingUp } from "lucide-react";
 import { nepseAPI, type TechnicalAnalysis } from "@/lib/services";
 
 interface Props {
-  symbol: string;
+  symbol?: string;
 }
 
 export function FundamentalsPanel({ symbol }: Props) {
   const [data, setData] = useState<TechnicalAnalysis | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!symbol) return;
+    if (!symbol) {
+      setData(null);
+      setLoading(false);
+      return;
+    }
     let mounted = true;
     const fetch = async () => {
       try {
@@ -46,12 +50,26 @@ export function FundamentalsPanel({ symbol }: Props) {
     );
   }
 
-  if (!data) return null;
+  if (!symbol || !data) {
+    return (
+      <Card className="border-border/50 shadow-sm bg-background/50 backdrop-blur-sm h-full flex flex-col">
+        <CardHeader className="pb-3 border-b border-border/50 flex flex-row items-center gap-2">
+          <Building2 className="w-5 h-5 text-primary" />
+          <CardTitle className="text-lg font-medium">Technical Snapshot</CardTitle>
+        </CardHeader>
+        <CardContent className="p-4 flex-1 flex items-center justify-center">
+          <p className="text-sm text-muted-foreground text-center">
+            Search for a symbol above to see technical analysis
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   const metrics = [
     { label: "Current Price", value: `Rs. ${data.currentPrice.toFixed(2)}` },
     { label: "Change", value: `${data.changePercent >= 0 ? "+" : ""}${data.changePercent.toFixed(2)}%`, colored: true, positive: data.changePercent >= 0 },
-    { label: "RSI (14)", value: data.rsi != null ? data.rsi.toFixed(1) : "—" },
+    { label: "RSI (14)", value: data.rsi14 != null ? data.rsi14.toFixed(1) : "—" },
     { label: "SMA 20", value: data.sma20 != null ? `Rs. ${data.sma20.toFixed(2)}` : "—" },
     { label: "SMA 50", value: data.sma50 != null ? `Rs. ${data.sma50.toFixed(2)}` : "—" },
     { label: "Support", value: data.supportResistance.support != null ? `Rs. ${data.supportResistance.support.toFixed(2)}` : "—" },

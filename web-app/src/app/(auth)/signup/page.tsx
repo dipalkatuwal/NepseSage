@@ -51,7 +51,7 @@ export default function SignupPage() {
     const result = await signup(form.name, form.email, form.password);
     setIsLoading(false);
     if (result.success) {
-      router.push("/onboarding");
+      router.push("/market");
     } else {
       setError(result.error || "Sign up failed.");
     }

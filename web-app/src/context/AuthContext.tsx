@@ -17,7 +17,6 @@ export interface AuthUser {
   avatarInitials: string;
   plan: "free" | "pro";
   joinedAt: string;
-  onboarded: boolean;
   disciplineScore?: number;
   riskTolerance?: string;
   watchlist?: string[];
@@ -43,7 +42,6 @@ interface AuthContextValue {
   ) => Promise<{ success: boolean; error?: string }>;
   loginAsGuest: () => void;
   logout: () => void;
-  completeOnboarding: (profile: AuthUser["profile"]) => void;
   updateUser: (updates: Partial<AuthUser>) => void;
   updateProfileAPI: (updates: {
     name?: string;
@@ -73,9 +71,8 @@ function mapBackendUser(data: BackendUser): AuthUser {
     name: data.name,
     email: data.email,
     avatarInitials: getInitials(data.name),
-    plan: data.plan === "pro" ? "pro" : "free",
+    plan: "free",
     joinedAt: new Date().toISOString(),
-    onboarded: true,
     disciplineScore: data.disciplineScore,
     riskTolerance: data.riskTolerance,
     watchlist: data.watchlist || [],
@@ -187,7 +184,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (data.token) {
           localStorage.setItem(TOKEN_KEY, data.token);
         }
-        const authUser = { ...mapBackendUser(data), onboarded: false };
+        const authUser = mapBackendUser(data);
         saveSession(authUser);
         setUser(authUser);
         setIsGuest(false);
@@ -210,7 +207,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       avatarInitials: "GU",
       plan: "free",
       joinedAt: new Date().toISOString(),
-      onboarded: true,
       watchlist: [],
     };
     saveSession(guestUser);
@@ -225,16 +221,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsGuest(false);
     router.push("/login");
   }, [router]);
-
-  const completeOnboarding = useCallback(
-    (profile: AuthUser["profile"]) => {
-      if (!user) return;
-      const updated = { ...user, onboarded: true, profile };
-      saveSession(updated);
-      setUser(updated);
-    },
-    [user]
-  );
 
   const updateUser = useCallback(
     (updates: Partial<AuthUser>) => {
@@ -290,7 +276,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signup,
         loginAsGuest,
         logout,
-        completeOnboarding,
         updateUser,
         updateProfileAPI,
         upgradeToPro,

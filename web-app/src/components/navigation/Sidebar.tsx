@@ -30,9 +30,9 @@ export function AppSidebar() {
       <SidebarHeader className="h-16 flex flex-row items-center justify-between px-4">
         {state === "expanded" && (
           <div className="flex flex-col">
-            <h1 className="font-heading text-lg font-bold text-primary">
+            <Link href={isAuthenticated ? "/" : "/market"} className="font-heading text-lg font-bold text-primary hover:opacity-80 transition-opacity">
               NepseSage
-            </h1>
+            </Link>
             
           </div>
         )}

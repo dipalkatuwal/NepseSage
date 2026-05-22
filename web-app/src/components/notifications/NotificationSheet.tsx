@@ -173,7 +173,7 @@ export function NotificationSheet() {
   const [open, setOpen] = useState(false);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
 
-  const isNew = !!(user && !user.onboarded);
+  const isNew = false;
   const name = user?.name ?? "Investor";
 
   const allCards = getCards(isNew, name);

@@ -70,9 +70,12 @@ export function Navbar() {
       >
         {!isSearchExpanded && <SidebarTrigger className="lg:hidden" />}
         {!isSearchExpanded && (
-          <span className="hidden font-heading text-primary font-semibold text-muted-foreground sm:inline-block">
+          <Link
+            href={isAuthenticated ? "/" : "/market"}
+            className="hidden font-heading text-primary font-semibold text-muted-foreground sm:inline-block hover:text-foreground transition-colors"
+          >
             NepseSage
-          </span>
+          </Link>
         )}
         <GlobalSearch onExpandChange={setIsSearchExpanded} />
       </div>
@@ -180,7 +183,7 @@ export function Navbar() {
                         <p className="text-xs leading-none text-muted-foreground mt-1 truncate">
                           {user?.email}
                         </p>
-                        <ProExpiryLabel expiresAt={user?.planExpiresAt} />
+                        <ProExpiryLabel expiresAt={(user as any)?.planExpiresAt} />
                       </div>
                     </div>
 

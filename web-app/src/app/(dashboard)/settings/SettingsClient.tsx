@@ -740,10 +740,10 @@ export default function SettingsClient() {
                           Unlimited Sage AI queries, advanced technical analysis, floorsheet data,
                           priority support, and early access to new features.
                         </p>
-                        {user?.planExpiresAt && (
+                        {(user as any)?.planExpiresAt && (
                           <p className="text-xs text-amber-500/80 mt-2 font-medium">
                             Renews on{" "}
-                            {new Date(user.planExpiresAt).toLocaleDateString("en-US", {
+                            {new Date((user as any).planExpiresAt).toLocaleDateString("en-US", {
                               year: "numeric",
                               month: "long",
                               day: "numeric",

@@ -159,8 +159,8 @@ export default function SimulatorClient() {
       </div>
 
       <div className="h-[500px]">
-        {/* @ts-ignore */}
         <ResizablePanelGroup
+          // @ts-expect-error
           direction="horizontal"
           className="min-h-full w-full rounded-lg border border-border"
         >
