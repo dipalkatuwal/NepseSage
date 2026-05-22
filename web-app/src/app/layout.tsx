@@ -9,11 +9,11 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "NEPSE Sage AI — Clinical Analyst",
+  title: "NepseSage — Clinical Analyst",
   description: "Clinical precision analysis for Nepal Stock Exchange investors",
-  authors: [{ name: "NEPSE Sage AI" }],
+  authors: [{ name: "NepseSage" }],
   openGraph: {
-    title: "NEPSE Sage AI",
+    title: "NepseSage",
     description: "Clinical precision analysis for NEPSE investors",
     type: "website",
   },
@@ -29,11 +29,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className="antialiased">
+      <body className="antialiased" suppressHydrationWarning>
         <AuthProvider>
           <ThemeProvider
             attribute="class"
-            defaultTheme="dark"
+            defaultTheme="system"
             enableSystem
             disableTransitionOnChange
           >

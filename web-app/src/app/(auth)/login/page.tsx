@@ -9,15 +9,15 @@ import { Eye, EyeOff, TrendingUp, Brain, BarChart2, Shield } from "lucide-react"
 const BRAND_QUOTES = [
   {
     text: "The market rewards discipline, not prediction.",
-    author: "NEPSE Sage AI",
+    author: "NepseSage",
   },
   {
     text: "Clinical precision separates investors from gamblers.",
-    author: "NEPSE Sage AI",
+    author: "NepseSage",
   },
   {
     text: "Every trade is a data point. Every bias, a lesson.",
-    author: "NEPSE Sage AI",
+    author: "NepseSage",
   },
 ];
 
@@ -97,7 +97,7 @@ export default function LoginPage() {
                 className="font-heading text-xl font-bold"
                 style={{ color: "oklch(0.92 0.01 250)" }}
               >
-                NEPSE Sage
+                NepseSage
               </h1>
               <p className="clinical-label" style={{ fontSize: "0.6rem" }}>
                 Clinical Analyst
@@ -162,7 +162,7 @@ export default function LoginPage() {
           >
             <TrendingUp className="h-4 w-4 text-white" />
           </div>
-          <span className="font-heading text-lg font-bold text-foreground">NEPSE Sage</span>
+          <span className="font-heading text-lg font-bold text-foreground">NepseSage</span>
         </div>
 
         <div className="w-full max-w-[400px] animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -298,7 +298,7 @@ export default function LoginPage() {
 
           {/* Sign up link */}
           <p className="mt-6 text-center text-sm text-muted-foreground">
-            New to NEPSE Sage?{" "}
+            New to NepseSage?{" "}
             <Link
               href="/signup"
               className="font-medium text-primary hover:underline underline-offset-4"

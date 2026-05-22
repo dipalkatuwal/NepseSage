@@ -1,99 +1,102 @@
 "use client";
 
-import { fundamentals } from "@/lib/market-data-complete";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Building2, TrendingUp, PieChart, Info } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Building2, TrendingUp } from "lucide-react";
+import { nepseAPI, type TechnicalAnalysis } from "@/lib/services";
 
-export function FundamentalsPanel() {
-  // Using NICA as the default example, in reality this would be driven by selection
-  const data = fundamentals[0];
+interface Props {
+  symbol: string;
+}
+
+export function FundamentalsPanel({ symbol }: Props) {
+  const [data, setData] = useState<TechnicalAnalysis | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!symbol) return;
+    let mounted = true;
+    const fetch = async () => {
+      try {
+        setLoading(true);
+        const res = await nepseAPI.getTechnical(symbol);
+        if (mounted) setData(res);
+      } catch {
+        // fail silently
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+    fetch();
+    return () => { mounted = false; };
+  }, [symbol]);
+
+  if (loading) {
+    return (
+      <Card className="border-border/50 shadow-sm bg-background/50 backdrop-blur-sm h-full">
+        <CardHeader className="pb-3 border-b border-border/50">
+          <Skeleton className="h-5 w-48" />
+        </CardHeader>
+        <CardContent className="p-4 space-y-4">
+          {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (!data) return null;
+
+  const metrics = [
+    { label: "Current Price", value: `Rs. ${data.currentPrice.toFixed(2)}` },
+    { label: "Change", value: `${data.changePercent >= 0 ? "+" : ""}${data.changePercent.toFixed(2)}%`, colored: true, positive: data.changePercent >= 0 },
+    { label: "RSI (14)", value: data.rsi != null ? data.rsi.toFixed(1) : "—" },
+    { label: "SMA 20", value: data.sma20 != null ? `Rs. ${data.sma20.toFixed(2)}` : "—" },
+    { label: "SMA 50", value: data.sma50 != null ? `Rs. ${data.sma50.toFixed(2)}` : "—" },
+    { label: "Support", value: data.supportResistance.support != null ? `Rs. ${data.supportResistance.support.toFixed(2)}` : "—" },
+    { label: "Resistance", value: data.supportResistance.resistance != null ? `Rs. ${data.supportResistance.resistance.toFixed(2)}` : "—" },
+    { label: "Signal", value: data.signal },
+  ];
 
   return (
     <Card className="border-border/50 shadow-sm bg-background/50 backdrop-blur-sm h-full flex flex-col">
       <CardHeader className="pb-3 border-b border-border/50 flex flex-row items-center justify-between">
         <div className="flex items-center gap-2">
           <Building2 className="w-5 h-5 text-primary" />
-          <CardTitle className="text-lg font-medium">Fundamentals Snapshot</CardTitle>
+          <CardTitle className="text-lg font-medium">Technical Snapshot</CardTitle>
         </div>
         <Badge variant="outline" className="text-xs bg-primary/10 text-primary border-primary/20">
-          {data.symbol}
+          {symbol}
         </Badge>
       </CardHeader>
-      <CardContent className="p-4 flex-1 overflow-y-auto space-y-6">
-        
-        {/* Key Ratios */}
-        <div>
-          <h4 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-1.5">
-            <TrendingUp className="w-4 h-4" />
-            Key Valuation Ratios
-          </h4>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="p-3 rounded-lg bg-muted/30 border border-border/40">
-              <div className="text-xs text-muted-foreground mb-1">P/E Ratio</div>
-              <div className="text-lg font-semibold">{data.peRatio.toFixed(2)}</div>
+      <CardContent className="p-4 flex-1 overflow-y-auto">
+        <div className="grid grid-cols-2 gap-3">
+          {metrics.map((m) => (
+            <div key={m.label} className="p-3 rounded-lg bg-muted/30 border border-border/40">
+              <div className="text-xs text-muted-foreground mb-1">{m.label}</div>
+              <div
+                className={`text-base font-semibold ${
+                  m.colored ? (m.positive ? "text-emerald-500" : "text-rose-500") : ""
+                }`}
+              >
+                {m.value}
+              </div>
             </div>
-            <div className="p-3 rounded-lg bg-muted/30 border border-border/40">
-              <div className="text-xs text-muted-foreground mb-1">P/B Ratio</div>
-              <div className="text-lg font-semibold">{data.pbRatio.toFixed(2)}</div>
-            </div>
-            <div className="p-3 rounded-lg bg-muted/30 border border-border/40">
-              <div className="text-xs text-muted-foreground mb-1">Book Value</div>
-              <div className="text-lg font-semibold">Rs. {data.bookValue.toFixed(2)}</div>
-            </div>
-            <div className="p-3 rounded-lg bg-muted/30 border border-border/40">
-              <div className="text-xs text-muted-foreground mb-1">ROE</div>
-              <div className="text-lg font-semibold text-emerald-500">{data.roe.toFixed(2)}%</div>
-            </div>
-          </div>
+          ))}
         </div>
 
-        {/* EPS Track */}
-        <div>
-          <h4 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-1.5">
-            <PieChart className="w-4 h-4" />
-            EPS Progression
-          </h4>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between p-2 rounded bg-muted/20 text-sm">
-              <span className="text-muted-foreground">Q1</span>
-              <span className="font-medium">Rs. {data.eps.q1.toFixed(2)}</span>
+        {data.trend && (
+          <div className="mt-4 p-3 rounded-lg bg-muted/20 border border-border/30">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-muted-foreground" />
+              <span className="text-sm font-medium">{data.trend}</span>
             </div>
-            <div className="flex items-center justify-between p-2 rounded bg-muted/20 text-sm">
-              <span className="text-muted-foreground">Q2</span>
-              <span className="font-medium">Rs. {data.eps.q2.toFixed(2)}</span>
-            </div>
-            <div className="flex items-center justify-between p-2 rounded bg-muted/20 text-sm">
-              <span className="text-muted-foreground">Q3</span>
-              <span className="font-medium">Rs. {data.eps.q3.toFixed(2)}</span>
-            </div>
-            <div className="flex items-center justify-between p-2 rounded bg-muted/20 text-sm border-l-2 border-primary">
-              <span className="font-medium text-foreground">Q4 (Current)</span>
-              <span className="font-semibold text-primary">Rs. {data.eps.q4.toFixed(2)}</span>
-            </div>
+            {data.accumulationSignal && (
+              <p className="text-xs text-muted-foreground mt-1">{data.accumulationSignal}</p>
+            )}
           </div>
-        </div>
-
-        {/* Dividends */}
-        <div>
-          <h4 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-1.5">
-            <Info className="w-4 h-4" />
-            Dividends & Returns
-          </h4>
-          <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-3">
-            <div className="flex justify-between items-end mb-2">
-              <span className="text-sm text-emerald-600/80 dark:text-emerald-400/80">Dividend Yield</span>
-              <span className="text-xl font-bold text-emerald-600 dark:text-emerald-400">{data.dividendYield.toFixed(2)}%</span>
-            </div>
-            <div className="flex justify-between text-xs mt-3 pt-2 border-t border-emerald-500/10">
-              <span className="text-muted-foreground">Ex-Date</span>
-              <span className="font-medium">{data.exDividendDate}</span>
-            </div>
-          </div>
-        </div>
-
+        )}
       </CardContent>
     </Card>
   );

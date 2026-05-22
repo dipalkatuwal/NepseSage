@@ -1,22 +1,28 @@
 "use client";
 
 import { useState } from "react";
+import { useNepse } from "@/hooks/useNepse";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { TrendingUp, TrendingDown } from "lucide-react";
-import { topGainers, topLosers, type TopMover } from "./market-data";
+import { MarketSymbol } from "@/lib/services";
+
+import Link from "next/link";
 
 type Tab = "gainers" | "losers";
 
-function formatVolume(v: number): string {
+function formatVolume(v?: number): string {
+    if (!v) return "-";
     if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(2)}M`;
     if (v >= 1_000) return `${(v / 1_000).toFixed(0)}K`;
     return String(v);
 }
 
-function MoverRow({ mover, positive }: { mover: TopMover; positive: boolean }) {
+function MoverRow({ mover, positive }: { mover: MarketSymbol; positive: boolean }) {
     return (
-        <div className="flex items-center justify-between py-3 border-b border-border/50 last:border-0 group hover:bg-secondary/30 -mx-5 px-5 transition-colors">
+        <Link
+            href={`/companyDetails/${mover.symbol}`}
+            className="flex items-center justify-between py-3 border-b border-border/50 last:border-0 group hover:bg-secondary/30 cursor-pointer -mx-5 px-5 transition-colors block"
+        >
             <div className="flex items-center gap-3">
                 <div
                     className={`h-8 w-8 rounded-md flex items-center justify-center text-[10px] font-heading font-bold shrink-0 ${positive
@@ -58,13 +64,18 @@ function MoverRow({ mover, positive }: { mover: TopMover; positive: boolean }) {
                     </p>
                 </div>
             </div>
-        </div>
+        </Link>
     );
 }
 
 export function TopMovers() {
+    const { gainers, losers, loading } = useNepse();
     const [tab, setTab] = useState<Tab>("gainers");
-    const movers = tab === "gainers" ? topGainers : topLosers;
+    const movers = tab === "gainers" ? gainers : losers;
+
+    if (loading && gainers.length === 0 && losers.length === 0) {
+        return <div className="animate-pulse h-64 bg-muted rounded-xl" />;
+    }
 
     return (
         <Card className="card-clinical p-0 shadow-none">
@@ -101,9 +112,13 @@ export function TopMovers() {
                 </div>
             </CardHeader>
             <CardContent className="px-5 pb-5 pt-0">
-                {movers.map((m) => (
+                {movers.length > 0 ? movers.map((m) => (
                     <MoverRow key={m.symbol} mover={m} positive={tab === "gainers"} />
-                ))}
+                )) : (
+                    <div className="py-8 text-center text-muted-foreground text-sm">
+                        No data available right now.
+                    </div>
+                )}
             </CardContent>
         </Card>
     );

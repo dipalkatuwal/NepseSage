@@ -51,6 +51,7 @@ interface AuthContextValue {
     riskTolerance?: string;
     watchlist?: string[];
   }) => Promise<void>;
+  upgradeToPro: (billingCycle: "monthly" | "yearly") => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -72,7 +73,7 @@ function mapBackendUser(data: BackendUser): AuthUser {
     name: data.name,
     email: data.email,
     avatarInitials: getInitials(data.name),
-    plan: "free",
+    plan: data.plan === "pro" ? "pro" : "free",
     joinedAt: new Date().toISOString(),
     onboarded: true,
     disciplineScore: data.disciplineScore,
@@ -266,6 +267,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [user]
   );
 
+  const upgradeToPro = useCallback(
+    async (billingCycle: "monthly" | "yearly") => {
+      if (!user) throw new Error("Authentication required");
+      const data = await authAPI.upgradeToPro(billingCycle);
+      const updated = { ...user, plan: "pro" as const };
+      saveSession(updated);
+      setUser(updated);
+      return data;
+    },
+    [user]
+  );
+
   return (
     <AuthContext.Provider
       value={{
@@ -280,6 +293,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         completeOnboarding,
         updateUser,
         updateProfileAPI,
+        upgradeToPro,
       }}
     >
       {children}

@@ -1,23 +1,31 @@
 "use client";
 
-import { useState } from "react";
-import { symbolMaster } from "@/lib/market-data-complete";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useNepse, useSymbolSearch } from "@/hooks/useNepse";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Search } from "lucide-react";
+import { Search, Loader2 } from "lucide-react";
 
 export function SymbolSearch() {
+  const router = useRouter();
+  const { sectors: sectorData } = useNepse();
+  const { results, searching, search } = useSymbolSearch();
   const [query, setQuery] = useState("");
   const [selectedSector, setSelectedSector] = useState("All");
 
-  const sectors = ["All", ...Array.from(new Set(symbolMaster.map((s) => s.sector)))];
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      search(query);
+    }, 300);
 
-  const filteredSymbols = symbolMaster.filter((s) => {
-    const matchesSearch = s.symbol.toLowerCase().includes(query.toLowerCase()) || 
-                          s.companyName.toLowerCase().includes(query.toLowerCase());
-    const matchesSector = selectedSector === "All" || s.sector === selectedSector;
-    return matchesSearch && matchesSector;
+    return () => clearTimeout(delayDebounceFn);
+  }, [query, search]);
+
+  const sectors = ["All", ...sectorData.map((s) => s._id).sort()];
+
+  const filteredSymbols = results.filter((s) => {
+    return selectedSector === "All" || s.sector === selectedSector;
   });
 
   return (
@@ -51,53 +59,60 @@ export function SymbolSearch() {
         </div>
       </CardHeader>
       <CardContent className="p-0">
-        <div className="overflow-x-auto">
+        <div className="overflow-auto max-h-[400px]">
           <table className="w-full text-sm text-left">
             <thead className="text-xs text-muted-foreground uppercase bg-muted/30">
               <tr>
                 <th className="px-4 py-3 font-medium">Symbol / Company</th>
                 <th className="px-4 py-3 font-medium text-right">LTP</th>
                 <th className="px-4 py-3 font-medium text-right">Change</th>
-                <th className="px-4 py-3 font-medium text-right">52W H/L</th>
-                <th className="px-4 py-3 font-medium text-right">Market Cap</th>
+                <th className="px-4 py-3 font-medium text-right">Volume</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/50">
-              {filteredSymbols.map((stock) => (
-                <tr key={stock.symbol} className="hover:bg-muted/20 transition-colors cursor-pointer">
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold">{stock.symbol}</span>
-                      <span className="text-muted-foreground text-xs hidden sm:inline-block max-w-[150px] truncate">
-                        {stock.companyName}
-                      </span>
-                    </div>
-                    <div className="text-[10px] text-muted-foreground mt-0.5">{stock.sector}</div>
-                  </td>
-                  <td className="px-4 py-3 text-right font-medium">
-                    {stock.currentLtp.toFixed(2)}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <div className={`flex flex-col items-end ${stock.change >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
-                      <span>{stock.change > 0 ? "+" : ""}{stock.change.toFixed(2)}</span>
-                      <span className="text-xs">{stock.changePercent > 0 ? "+" : ""}{stock.changePercent.toFixed(2)}%</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-right text-xs">
-                    <div className="text-emerald-500">{stock.high52Week.toFixed(2)}</div>
-                    <div className="text-rose-500">{stock.low52Week.toFixed(2)}</div>
-                  </td>
-                  <td className="px-4 py-3 text-right text-xs text-muted-foreground">
-                    Rs. {stock.marketCap.toLocaleString()} Cr
+              {searching ? (
+                <tr>
+                  <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">
+                    <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" />
+                    Searching...
                   </td>
                 </tr>
-              ))}
-              {filteredSymbols.length === 0 && (
+              ) : filteredSymbols.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
+                  <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">
                     No companies found matching your search.
                   </td>
                 </tr>
+              ) : (
+                filteredSymbols.map((stock, index) => (
+                  <tr
+                    key={stock.symbol ? `${stock.symbol}-${index}` : index}
+                    onClick={() => router.push(`/companyDetails/${stock.symbol}`)}
+                    className="hover:bg-muted/20 transition-colors cursor-pointer"
+                  >
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold">{stock.symbol}</span>
+                        <span className="text-muted-foreground text-xs hidden sm:inline-block max-w-[150px] truncate">
+                          {stock.companyName}
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-muted-foreground mt-0.5">{stock.sector}</div>
+                    </td>
+                    <td className="px-4 py-3 text-right font-medium">
+                      {stock.ltp.toFixed(2)}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <div className={`flex flex-col items-end ${stock.change >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
+                        <span>{stock.change > 0 ? "+" : ""}{stock.change.toFixed(2)}</span>
+                        <span className="text-xs">{stock.changePercent > 0 ? "+" : ""}{stock.changePercent.toFixed(2)}%</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-right text-xs text-muted-foreground">
+                      {stock.volume ? stock.volume.toLocaleString() : "-"}
+                    </td>
+                  </tr>
+                ))
               )}
             </tbody>
           </table>

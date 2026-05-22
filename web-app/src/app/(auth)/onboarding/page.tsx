@@ -111,7 +111,7 @@ export default function OnboardingPage() {
         >
           <TrendingUp className="h-4 w-4 text-white" />
         </div>
-        <span className="font-heading text-lg font-bold text-foreground">NEPSE Sage</span>
+        <span className="font-heading text-lg font-bold text-foreground">NepseSage</span>
       </div>
 
       {/* Step indicator */}

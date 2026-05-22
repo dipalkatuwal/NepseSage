@@ -21,7 +21,7 @@ export default function DashboardPage() {
           <CoreHoldingsTable />
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <OpportunityRadar />
+            <SectorAllocation />
             <RiskMeter />
           </div>
         </div>
@@ -29,7 +29,8 @@ export default function DashboardPage() {
         {/* Right Sidebar */}
         <div className="space-y-6">
           <Watchlist />
-          <SectorAllocation />
+          
+          <OpportunityRadar />
           <CommunityBuzz />
         </div>
       </div>

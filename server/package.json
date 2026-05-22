@@ -11,8 +11,9 @@
   "keywords": [],
   "author": "Dipal Katuwal",
   "license": "ISC",
-  "description": "Backend for NEPSE Sage AI",
+  "description": "Backend for NepseSage",
   "dependencies": {
+    "@rumess/nepse-api": "^1.0.5",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",

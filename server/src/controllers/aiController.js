@@ -18,7 +18,7 @@ const getOpenAI = () => {
 
 const MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 
-const SAGE_SYSTEM_PROMPT = `You are NEPSE Sage, an elite financial analyst specializing exclusively in the Nepal Stock Exchange (NEPSE). 
+const SAGE_SYSTEM_PROMPT = `You are NepseSage, an elite financial analyst specializing exclusively in the Nepal Stock Exchange (NEPSE). 
 
 Your expertise:
 - Deep knowledge of Nepali listed companies, sectors (Commercial Banks, Hydropower, Insurance, Microfinance, Telecom)
@@ -226,55 +226,35 @@ Provide behavioral insights and improvements.`;
 
 
 // ============================
-// 📈 Sentiment
+// Sentiment
 // ============================
 export const getMarketSentiment = async (req, res) => {
-  const openai = getOpenAI();
-
-  const gainers = await MarketData.find({
-    isActive: true,
-    changePercent: { $gt: 0 },
-  }).countDocuments();
-
-  const losers = await MarketData.find({
-    isActive: true,
-    changePercent: { $lt: 0 },
-  }).countDocuments();
-
-  const topGainers = await MarketData.find({ isActive: true })
-    .sort({ changePercent: -1 })
-    .limit(5);
-
-  const topLosers = await MarketData.find({ isActive: true })
-    .sort({ changePercent: 1 })
-    .limit(5);
-
-  const prompt = `Market:
-Gainers: ${gainers}
-Losers: ${losers}`;
-
   try {
-    const response = await openai.chat.completions.create({
-      model: MODEL,
-      messages: [
-        { role: "system", content: SAGE_SYSTEM_PROMPT },
-        { role: "user", content: prompt },
-      ],
-      max_tokens: 200,
-    });
+    const [gainers, losers, topGainers, topLosers] = await Promise.all([
+      MarketData.countDocuments({ isActive: true, changePercent: { $gt: 0 } }),
+      MarketData.countDocuments({ isActive: true, changePercent: { $lt: 0 } }),
+      MarketData.find({ isActive: true }).sort({ changePercent: -1 }).limit(5).lean(),
+      MarketData.find({ isActive: true }).sort({ changePercent:  1 }).limit(5).lean(),
+    ]);
 
-    res.json({
-      sentiment: gainers > losers ? "bullish" : gainers < losers ? "bearish" : "neutral",
-      summary: response.choices[0].message.content,
-      gainers,
-      losers,
-      topGainers,
-      topLosers,
-    });
+    const total = gainers + losers;
+    const bullRatio = total > 0 ? gainers / total : 0.5;
+
+    let sentiment, summary;
+
+    if (bullRatio >= 0.6) {
+      sentiment = "bullish";
+      summary = `${gainers} stocks advancing vs ${losers} declining. Broad-based buying pressure with ${Math.round(bullRatio * 100)}% of active counters in positive territory. Liquidity conditions favour momentum continuation near-term.`;
+    } else if (bullRatio <= 0.4) {
+      sentiment = "bearish";
+      summary = `${losers} stocks declining vs ${gainers} advancing. Selling pressure dominates with ${Math.round((1 - bullRatio) * 100)}% of active counters in negative territory. Watch NRB liquidity data and FPO pipeline for reversal triggers.`;
+    } else {
+      sentiment = "neutral";
+      summary = `Market breadth is mixed with ${gainers} gainers and ${losers} decliners. No clear directional bias. Monitor breakout levels on index heavyweights (NABIL, NICA, NLIC) for confirmation of next directional move.`;
+    }
+
+    res.json({ sentiment, summary, gainers, losers, topGainers, topLosers });
   } catch (err) {
-    res.status(500).json({
-      message: "Sentiment analysis failed",
-      error: err.message,
-    });
+    res.status(500).json({ message: "Sentiment analysis failed", error: err.message });
   }
 };

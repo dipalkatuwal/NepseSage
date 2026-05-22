@@ -1,12 +1,12 @@
-# NEPSE Sage AI 🇳🇵
+# NepseSage 🇳🇵
 
-**NEPSE Sage AI** is a professional-grade clinical analysis platform for the Nepal Stock Exchange. It transforms raw market data into high-precision visual intelligence, combining an institutional-grade UI with advanced AI behavioral insights.
+**NepseSage** is a professional-grade clinical analysis platform for the Nepal Stock Exchange. It transforms raw market data into high-precision visual intelligence, combining an institutional-grade UI with advanced AI behavioral insights.
 
 ---
 
 ## 🏛️ Architecture & Context
 
-NEPSE Sage AI has evolved into a full-stack **MERN-like** architecture, utilizing **Next.js 15 (App Router)** for the frontend and an **Express.js / Node.js** server for the backend, powered by **MongoDB**. It is designed with a **"Clinical Analyst"** philosophy: high-density data, zero-latency interactions, and a professional navy aesthetic.
+NepseSage has evolved into a full-stack **MERN-like** architecture, utilizing **Next.js 15 (App Router)** for the frontend and an **Express.js / Node.js** server for the backend, powered by **MongoDB**. It is designed with a **"Clinical Analyst"** philosophy: high-density data, zero-latency interactions, and a professional navy aesthetic.
 
 ### 🧠 Core Intelligence
 - **Behavioral Analysis**: Tracks "Discipline Scores" and identifies cognitive biases (FOMO, Revenge Trading) via the Journal.

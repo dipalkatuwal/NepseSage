@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import JournalClient from "./JournalClient";
 
 export const metadata: Metadata = {
-  title: "Behavior Lab — NEPSE Sage AI",
+  title: "Behavior Lab — NepseSage",
   description: "Analyze the psychology behind your trades",
 };
 

@@ -94,8 +94,9 @@ export default function SimulatorClient() {
 
   return (
     <AuthGuard
+      require="pro"
       featureName="Trading Simulator"
-      featureDesc="The Trading Simulator allows you to practice your strategies with Rs. 10,00,000 in virtual capital. Sign in to start your paper trading journey without risk."
+      featureDesc="Practice strategies with Rs. 10,00,000 in virtual capital using real NEPSE data. Upgrade to Pro to start paper trading without any risk."
     >
       <Breadcrumb className="mb-4">
         <BreadcrumbList>

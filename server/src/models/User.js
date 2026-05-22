@@ -39,6 +39,20 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    // Subscription plan
+    plan: {
+      type: String,
+      enum: ["free", "pro"],
+      default: "free",
+    },
+    planActivatedAt: {
+      type: Date,
+      default: null,
+    },
+    planExpiresAt: {
+      type: Date,
+      default: null,
+    },
     // Discipline tracking
     disciplineScore: {
       type: Number,

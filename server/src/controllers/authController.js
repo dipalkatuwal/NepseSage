@@ -30,6 +30,7 @@ export const register = async (req, res) => {
       _id: user._id,
       name: user.name,
       email: user.email,
+      plan: user.plan,
       disciplineScore: user.disciplineScore,
       watchlist: user.watchlist,
       token: generateToken(user._id),
@@ -58,6 +59,8 @@ export const login = async (req, res) => {
     _id: user._id,
     name: user.name,
     email: user.email,
+    plan: user.plan,
+    planExpiresAt: user.planExpiresAt,
     disciplineScore: user.disciplineScore,
     riskTolerance: user.riskTolerance,
     watchlist: user.watchlist,
@@ -99,4 +102,62 @@ export const changePassword = async (req, res) => {
   user.password = newPassword;
   await user.save();
   res.json({ message: "Password updated successfully" });
+};
+
+// @desc   Upgrade user to Pro (mock payment — real gateway added later)
+// @route  POST /api/auth/upgrade
+export const upgradeToPro = async (req, res) => {
+  try {
+    const { plan, billingCycle } = req.body; // plan: "pro", billingCycle: "monthly"|"yearly"
+
+    if (plan !== "pro") {
+      return res.status(400).json({ message: "Invalid plan" });
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // Calculate expiry based on billing cycle
+    const now = new Date();
+    const expiresAt = new Date(now);
+    if (billingCycle === "yearly") {
+      expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+    } else {
+      expiresAt.setMonth(expiresAt.getMonth() + 1);
+    }
+
+    user.plan = "pro";
+    user.planActivatedAt = now;
+    user.planExpiresAt = expiresAt;
+    await user.save();
+
+    res.json({
+      success: true,
+      plan: user.plan,
+      planActivatedAt: user.planActivatedAt,
+      planExpiresAt: user.planExpiresAt,
+      message: "Upgraded to Pro successfully",
+    });
+  } catch (error) {
+    console.error("UPGRADE ERROR:", error);
+    res.status(500).json({ message: "Upgrade failed. Please try again." });
+  }
+};
+
+// @desc   Downgrade user back to Free
+// @route  POST /api/auth/downgrade
+export const downgradeToFree = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    user.plan = "free";
+    user.planActivatedAt = null;
+    user.planExpiresAt = null;
+    await user.save();
+
+    res.json({ success: true, plan: "free", message: "Downgraded to Free" });
+  } catch (error) {
+    res.status(500).json({ message: "Downgrade failed" });
+  }
 };

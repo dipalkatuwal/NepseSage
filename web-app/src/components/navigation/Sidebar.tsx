@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Lock, Zap, HelpCircle, LogOut } from "lucide-react";
+import { Lock, Zap, HelpCircle } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -21,7 +21,9 @@ import { navItems } from "./nav-data";
 export function AppSidebar() {
   const pathname = usePathname();
   const { state } = useSidebar();
-  const { isAuthenticated, isGuest, logout } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+
+  const isPro = user?.plan === "pro";
 
   return (
     <Sidebar collapsible="icon" className="border-r border-border bg-sidebar">
@@ -29,11 +31,9 @@ export function AppSidebar() {
         {state === "expanded" && (
           <div className="flex flex-col">
             <h1 className="font-heading text-lg font-bold text-primary">
-              NEPSE Sage
+              NepseSage
             </h1>
-            <p className="clinical-label mt-0.5" style={{ fontSize: "0.6rem" }}>
-              Clinical Analyst
-            </p>
+            
           </div>
         )}
         <SidebarTrigger className="ml-auto" />
@@ -46,34 +46,45 @@ export function AppSidebar() {
               pathname === item.to ||
               (item.to !== "/" && pathname.startsWith(item.to));
 
-            // Lock everything for guests since they only access /market (Top Nav)
-            const isLocked = isGuest || (!isAuthenticated && ["/journal", "/sage-ai", "/simulator", "/settings"].includes(item.to));
-            const showLock = isLocked;
+            // Determine lock state
+            const isUserLocked = !isAuthenticated && item.access !== "public";
+            const isProLocked  = isAuthenticated && !isPro && item.access === "pro";
+            const isLocked     = isUserLocked || isProLocked;
+
+            // Which badge to show
+            const LockBadge = isProLocked
+              ? () => <Zap className="h-3 w-3 text-amber-400/70" />
+              : () => <Lock className="h-3 w-3 text-muted-foreground/50" />;
+
+            // Where to navigate on click:
+            // - unauthenticated + restricted → /login
+            // - free user + pro item → the actual page (which shows ProGate)
+            // - unlocked → item's own route
+            const href = isUserLocked ? "/login" : item.to;
 
             return (
               <SidebarMenuItem key={item.to}>
                 <SidebarMenuButton
                   asChild
                   isActive={isActive}
-                  tooltip={item.label}
-                  className={`nav-item ${isActive ? "nav-item-active" : ""} border-none h-10 ${isLocked ? "opacity-50 grayscale pointer-events-none" : ""}`}
+                  tooltip={
+                    isProLocked
+                      ? `${item.label} — Pro feature`
+                      : isUserLocked
+                      ? `${item.label} — Sign in required`
+                      : item.label
+                  }
+                  className={`nav-item ${isActive ? "nav-item-active" : ""} border-none h-10 ${
+                    isLocked ? "opacity-50" : ""
+                  }`}
                 >
-                  {isLocked ? (
-                    <div className="flex items-center justify-between w-full px-2">
-                      <div className="flex items-center gap-2">
-                        <item.icon className="h-4 w-4 shrink-0" />
-                        <span>{item.label}</span>
-                      </div>
-                      <Lock className="h-3 w-3 text-muted-foreground/50" />
+                  <Link href={href} className="flex items-center justify-between w-full">
+                    <div className="flex items-center gap-2">
+                      <item.icon className="h-4 w-4 shrink-0" />
+                      <span>{item.label}</span>
                     </div>
-                  ) : (
-                    <Link href={item.to} className="flex items-center justify-between w-full">
-                      <div className="flex items-center gap-2">
-                        <item.icon className="h-4 w-4 shrink-0" />
-                        <span>{item.label}</span>
-                      </div>
-                    </Link>
-                  )}
+                    {isLocked && <LockBadge />}
+                  </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             );
@@ -82,27 +93,28 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter className="p-2">
-        {state === "expanded" && (
+        {state === "expanded" && !isPro && (
           <div className="card-clinical mb-3 p-3">
-            <p className="clinical-label mb-2">{isAuthenticated ? "Sage Insight" : "Pro Account"}</p>
-            <Button variant="clinical" size="sm" className="w-full">
-              <Zap className="mr-1.5 h-3 w-3" />
-              {isAuthenticated ? "Upgrade Plan" : "Upgrade to Pro"}
-            </Button>
+            <p className="clinical-label mb-2">
+              {isAuthenticated ? "Sage Insight" : "Pro Account"}
+            </p>
+            <Link href="/upgrade">
+              <Button variant="clinical" size="sm" className="w-full">
+                <Zap className="mr-1.5 h-3 w-3" />
+                {isAuthenticated ? "Upgrade to Pro" : "Get Pro Access"}
+              </Button>
+            </Link>
           </div>
         )}
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton tooltip="Support" className="nav-item border-none h-10">
-              <HelpCircle className="h-4 w-4 shrink-0" />
-              <span>Support</span>
+            <SidebarMenuButton asChild tooltip="Support" className="nav-item border-none h-10">
+              <Link href="/settings?tab=Support" className="flex items-center gap-2">
+                <HelpCircle className="h-4 w-4 shrink-0" />
+                <span>Support</span>
+              </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
-          {isAuthenticated && (
-            <SidebarMenuItem>
-
-            </SidebarMenuItem>
-          )}
         </SidebarMenu>
       </SidebarFooter>
     </Sidebar>

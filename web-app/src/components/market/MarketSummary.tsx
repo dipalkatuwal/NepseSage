@@ -1,52 +1,69 @@
 "use client";
 
+import { useNepse } from "@/hooks/useNepse";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TrendingUp, TrendingDown, Activity, Clock } from "lucide-react";
-import { marketSummary } from "./market-data";
 
-function formatVolume(v: number): string {
-    if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(2)}M`;
-    if (v >= 1_000) return `${(v / 1_000).toFixed(1)}K`;
-    return String(v);
+function formatVolume(v: number | undefined | null): string {
+    const n = Number(v) || 0;
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
+    if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+    return String(n);
 }
 
-const summaryStats = [
-    {
-        label: "Total Turnover",
-        value: `Rs. ${marketSummary.totalTurnover.toFixed(2)} Cr`,
-        icon: Activity,
-    },
-    {
-        label: "Total Trades",
-        value: marketSummary.totalTrades.toLocaleString(),
-        icon: Activity,
-    },
-    {
-        label: "Total Volume",
-        value: formatVolume(marketSummary.totalVolume),
-        icon: Activity,
-    },
-    {
-        label: "52W High",
-        value: marketSummary.high52Week.toLocaleString(),
-        icon: TrendingUp,
-    },
-    {
-        label: "52W Low",
-        value: marketSummary.low52Week.toLocaleString(),
-        icon: TrendingDown,
-    },
-];
+function formatTurnover(v: number | undefined | null): string {
+    const n = Number(v) || 0;
+    if (n === 0) return "Rs. —";
+    if (n >= 1_000_000_000) return `Rs. ${(n / 1_000_000_000).toFixed(2)}B`;
+    if (n >= 1_000_000) return `Rs. ${(n / 1_000_000).toFixed(2)}M`;
+    if (n >= 1_000) return `Rs. ${(n / 1_000).toFixed(1)}K`;
+    return `Rs. ${n}`;
+}
+
+function formatMarketTime(raw: string | null | undefined): string {
+    if (!raw) return "-";
+    const d = new Date(raw);
+    if (isNaN(d.getTime())) return raw;
+    const date = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    const time = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+    return `${date} | ${time}`;
+}
 
 export function MarketSummary() {
-    const positive = marketSummary.change >= 0;
-    
+    const { summary, loading } = useNepse();
+
+    if (loading && !summary) {
+        return <div className="animate-pulse h-[200px] w-full bg-muted rounded-xl" />;
+    }
+
+    if (!summary) return null;
+
+    const positive = summary.indexChange >= 0;
+
     // Breadth calculations
-    const totalBreadth = (marketSummary.advances || 0) + (marketSummary.declines || 0) + (marketSummary.unchanged || 0);
-    const advPercent = totalBreadth > 0 ? ((marketSummary.advances || 0) / totalBreadth) * 100 : 0;
-    const decPercent = totalBreadth > 0 ? ((marketSummary.declines || 0) / totalBreadth) * 100 : 0;
-    const unchPercent = totalBreadth > 0 ? ((marketSummary.unchanged || 0) / totalBreadth) * 100 : 0;
+    const totalBreadth = summary.gainers + summary.losers + summary.unchanged;
+    const advPercent = totalBreadth > 0 ? (summary.gainers / totalBreadth) * 100 : 0;
+    const decPercent = totalBreadth > 0 ? (summary.losers / totalBreadth) * 100 : 0;
+    const unchPercent = totalBreadth > 0 ? (summary.unchanged / totalBreadth) * 100 : 0;
+
+    const summaryStats = [
+        {
+            label: "Total Turnover",
+            value: formatTurnover(summary.totalTurnover),
+            icon: Activity,
+        },
+        {
+            label: "Total Volume",
+            value: formatVolume(summary.totalVolume),
+            icon: Activity,
+        },
+        {
+            label: "Listed Symbols",
+            value: (summary.totalSymbols ?? 0).toLocaleString(),
+            icon: Activity,
+        },
+    ];
 
     return (
         <div className="space-y-4">
@@ -60,7 +77,7 @@ export function MarketSummary() {
                                 <p className="clinical-label mb-1">NEPSE Index</p>
                                 <div className="flex items-end gap-3">
                                     <span className="font-heading text-4xl font-bold text-foreground">
-                                        {marketSummary.indexValue.toLocaleString("en-IN", {
+                                        {(summary.nepseIndex ?? 0).toLocaleString("en-IN", {
                                             minimumFractionDigits: 2,
                                             maximumFractionDigits: 2,
                                         })}
@@ -73,8 +90,8 @@ export function MarketSummary() {
                                         )}
                                         <span className="font-heading text-lg font-semibold">
                                             {positive ? "+" : ""}
-                                            {marketSummary.change.toFixed(2)} ({positive ? "+" : ""}
-                                            {marketSummary.changePercent.toFixed(2)}%)
+                                            {(summary.indexChange ?? 0).toFixed(2)} ({positive ? "+" : ""}
+                                            {(summary.indexChangePercent ?? 0).toFixed(2)}%)
                                         </span>
                                     </div>
                                 </div>
@@ -82,14 +99,14 @@ export function MarketSummary() {
                         </div>
 
                         {/* Market Breadth */}
-                        {marketSummary.advances !== undefined && (
+                        {summary.gainers !== undefined && (
                             <div className="flex-1 w-full lg:max-w-md">
                                 <div className="flex justify-between items-center mb-1.5">
                                     <span className="clinical-label">Market Breadth</span>
                                     <div className="flex gap-3 text-xs font-medium">
-                                        <span className="text-success">{marketSummary.advances} Adv</span>
-                                        <span className="text-destructive">{marketSummary.declines} Dec</span>
-                                        <span className="text-muted-foreground">{marketSummary.unchanged} Unc</span>
+                                        <span className="text-success">{summary.gainers} Adv</span>
+                                        <span className="text-destructive">{summary.losers} Dec</span>
+                                        <span className="text-muted-foreground">{summary.unchanged} Unc</span>
                                     </div>
                                 </div>
                                 <div className="h-2 w-full rounded-full overflow-hidden flex bg-muted">
@@ -102,46 +119,38 @@ export function MarketSummary() {
 
                         {/* Status + last updated */}
                         <div className="flex items-center gap-4 lg:ml-auto">
-                            <div className="text-right hidden sm:block">
-                                <p className="clinical-label mb-1">Market Cap (Cr)</p>
-                                <span className="font-semibold text-sm">Rs. {(marketSummary.marketCap || 0).toLocaleString()}</span>
-                            </div>
                             <div className="h-8 w-px bg-border hidden sm:block" />
                             <div className="text-right">
                                 <p className="clinical-label mb-1">Market Status</p>
                                 <Badge
-                                    className={`text-xs font-semibold border-0 ${marketSummary.status === "Open"
+                                    className={`text-xs font-semibold border-0 ${summary.isMarketOpen
                                             ? "badge-bullish"
-                                            : marketSummary.status === "Pre-Open"
-                                                ? "bg-warning/15 text-warning"
-                                                : "bg-secondary text-muted-foreground"
+                                            : "bg-secondary text-muted-foreground"
                                         }`}
                                 >
                                     <span
-                                        className={`inline-block h-1.5 w-1.5 rounded-full mr-1.5 ${marketSummary.status === "Open"
+                                        className={`inline-block h-1.5 w-1.5 rounded-full mr-1.5 ${summary.isMarketOpen
                                                 ? "bg-success animate-pulse"
-                                                : marketSummary.status === "Pre-Open"
-                                                    ? "bg-warning"
-                                                    : "bg-muted-foreground"
+                                                : "bg-muted-foreground"
                                             }`}
                                     />
-                                    {marketSummary.status}
+                                    {summary.isMarketOpen ? "Open" : "Closed"}
                                 </Badge>
                             </div>
                             <div className="text-right hidden md:block">
                                 <p className="clinical-label mb-1">Last Updated</p>
                                 <div className="flex items-center gap-1 text-sm text-muted-foreground">
                                     <Clock className="h-3 w-3" />
-                                    <span className="font-mono text-xs">{marketSummary.lastUpdated}</span>
+                                    <span className="font-mono text-xs">{formatMarketTime(summary.marketAsOf)}</span>
                                 </div>
                             </div>
                         </div>
                     </div>
 
                     {/* Stats grid */}
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 divide-x divide-y sm:divide-y-0 divide-border">
+                    <div className="grid grid-cols-3 divide-x divide-border">
                         {summaryStats.map((s) => (
-                            <div key={s.label} className="p-4 first:divide-x-0">
+                            <div key={s.label} className="p-4">
                                 <div className="flex items-center gap-2 mb-1">
                                     <s.icon className="w-3.5 h-3.5 text-muted-foreground" />
                                     <p className="clinical-label">{s.label}</p>

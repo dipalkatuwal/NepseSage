@@ -18,165 +18,117 @@ interface Message {
 
 const WELCOME: Message = {
   type: "ai",
-  text: "Namaste! I'm Sage, your NEPSE clinical analyst. Ask me about any listed company — technical levels, sector outlook, behavioral insights, or portfolio strategy.",
-  time: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+  text: "Hello! I'm Sage, your AI-powered NEPSE market analyst. Ask me anything about Nepali stocks — technicals, fundamentals, sector trends, or trade ideas.",
+  time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
 };
 
 export default function SageAIClient() {
+  return (
+    <AuthGuard
+      require="pro"
+      featureName="Sage AI"
+      featureDesc="Unlock unlimited AI-powered stock analysis, sector breakdowns, and trade ideas with a Pro plan."
+    >
+      <SageAIContent />
+    </AuthGuard>
+  );
+}
+
+function SageAIContent() {
   const [messages, setMessages] = useState<Message[]>([WELCOME]);
   const [input, setInput] = useState("");
-  const [isStreaming, setIsStreaming] = useState(false);
+  const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const sendMessage = useCallback(async () => {
+  const send = useCallback(async () => {
     const text = input.trim();
-    if (!text || isStreaming) return;
-
+    if (!text || loading) return;
     setInput("");
-    const time = new Date().toLocaleTimeString("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
 
-    const userMsg: Message = { type: "user", text, time };
-    setMessages((prev) => [...prev, userMsg]);
+    const userMsg: Message = {
+      type: "user",
+      text,
+      time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    };
+    const aiPlaceholder: Message = {
+      type: "ai",
+      text: "",
+      time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      streaming: true,
+    };
 
-    // Add placeholder AI message
-    const aiMsg: Message = { type: "ai", text: "", time: "", streaming: true };
-    setMessages((prev) => [...prev, aiMsg]);
-    setIsStreaming(true);
+    setMessages((prev) => [...prev, userMsg, aiPlaceholder]);
+    setLoading(true);
 
     try {
-      // Build conversation history (last 10 messages)
-      const history = [...messages.slice(-9), userMsg].map((m) => ({
-        role: m.type === "user" ? ("user" as const) : ("assistant" as const),
-        content: m.text,
-      }));
-
-      let fullText = "";
-      for await (const chunk of aiAPI.chat(history)) {
-        fullText += chunk;
+      let full = "";
+      for await (const chunk of aiAPI.analyzeStock(text)) {
+        full += chunk;
         setMessages((prev) => {
-          const updated = [...prev];
-          updated[updated.length - 1] = {
-            type: "ai",
-            text: fullText,
-            time: new Date().toLocaleTimeString("en-US", {
-              hour: "2-digit",
-              minute: "2-digit",
-            }),
-            streaming: true,
-          };
-          return updated;
+          const next = [...prev];
+          next[next.length - 1] = { ...aiPlaceholder, text: full };
+          return next;
         });
       }
-
-      // Mark streaming done
       setMessages((prev) => {
-        const updated = [...prev];
-        updated[updated.length - 1] = {
-          ...updated[updated.length - 1],
-          streaming: false,
-        };
-        return updated;
+        const next = [...prev];
+        next[next.length - 1] = { ...aiPlaceholder, text: full, streaming: false };
+        return next;
       });
     } catch {
       setMessages((prev) => {
-        const updated = [...prev];
-        updated[updated.length - 1] = {
-          type: "ai",
-          text: "I encountered an error connecting to the analysis engine. Please try again.",
-          time: "",
+        const next = [...prev];
+        next[next.length - 1] = {
+          ...aiPlaceholder,
+          text: "Sorry, I couldn't process that request. Please try again.",
           streaming: false,
         };
-        return updated;
+        return next;
       });
     } finally {
-      setIsStreaming(false);
-      inputRef.current?.focus();
+      setLoading(false);
     }
-  }, [input, isStreaming, messages]);
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
-  };
+  }, [input, loading]);
 
   return (
-    <AuthGuard
-      featureName="Sage AI"
-      featureDesc="NEPSE Sage AI is a high-precision clinical analyst. Sign in to chat with the AI about your portfolio and NEPSE market trends."
-    >
-      <div className="flex flex-col h-[calc(100vh-3.5rem)] w-full overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-1 bg-background/50 backdrop-blur-sm sticky top-0 z-20">
-          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-50">
-            Sage AI Assistant
-          </span>
+    <div className="flex flex-col h-full">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
+        <div>
+          <h1 className="font-heading text-lg font-bold">Sage AI</h1>
+          <p className="text-xs text-muted-foreground">AI-powered NEPSE market analyst</p>
+        </div>
+        <div className="flex items-center gap-2">
           <SageContextSheet />
-        </div>
-
-        {/* Messages */}
-        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-4 py-4">
-          <div className="max-w-3xl mx-auto space-y-6">
-            {messages.map((msg, i) => (
-              <MessageItem
-                key={i}
-                msg={{
-                  ...msg,
-                  text: msg.streaming && !msg.text ? "▋" : msg.text,
-                }}
-              />
-            ))}
-            <div ref={bottomRef} />
-          </div>
-        </div>
-
-        {/* Input */}
-        <div className="flex-shrink-0 bg-gradient-to-t from-background via-background/95 to-transparent pt-3 pb-3">
-          <div className="max-w-3xl mx-auto px-4 w-full">
-            <div className="relative group">
-              <div className="flex items-center bg-secondary/30 border border-border/50 rounded-full px-4 py-2 hover:border-primary/20 transition-all shadow-sm">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-9 w-9 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary/50"
-                >
-                  <Plus className="h-5 w-5" />
-                </Button>
-                <Input
-                  ref={inputRef}
-                  type="text"
-                  placeholder="Ask Sage AI anything about NEPSE..."
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  disabled={isStreaming}
-                  className="flex-1 bg-transparent border-none focus-visible:ring-0 text-[15px] py-3 shadow-none placeholder:text-muted-foreground/40"
-                />
-                <Button
-                  size="icon"
-                  onClick={sendMessage}
-                  disabled={!input.trim() || isStreaming}
-                  className="h-9 w-9 rounded-full bg-foreground text-background hover:opacity-90 transition-all disabled:opacity-40"
-                >
-                  <Send className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-            <p className="text-center text-[11px] text-muted-foreground/40 mt-2 font-normal">
-              Sage AI can make mistakes. Check important info.
-            </p>
-          </div>
+          <Button variant="outline" size="sm" onClick={() => setMessages([WELCOME])}>
+            <Plus className="h-3.5 w-3.5 mr-1.5" /> New Chat
+          </Button>
         </div>
       </div>
-    </AuthGuard>
+
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+        {messages.map((m, i) => (
+          <MessageItem key={i} msg={m} />
+        ))}
+        <div ref={bottomRef} />
+      </div>
+
+      <div className="shrink-0 border-t border-border px-4 py-3 flex gap-2">
+        <Input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && send()}
+          placeholder="Ask about any NEPSE stock or sector..."
+          disabled={loading}
+          className="flex-1"
+        />
+        <Button onClick={send} disabled={loading || !input.trim()} size="icon">
+          <Send className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
   );
 }

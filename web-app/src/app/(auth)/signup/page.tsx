@@ -98,7 +98,7 @@ export default function SignupPage() {
           </div>
           <div>
             <h1 className="font-heading text-xl font-bold" style={{ color: "oklch(0.92 0.01 250)" }}>
-              NEPSE Sage
+              NepseSage
             </h1>
             <p className="clinical-label" style={{ fontSize: "0.6rem" }}>Clinical Analyst</p>
           </div>
@@ -168,7 +168,7 @@ export default function SignupPage() {
           <div className="h-8 w-8 rounded-lg flex items-center justify-center" style={{ background: "oklch(0.72 0.17 165)" }}>
             <TrendingUp className="h-4 w-4 text-white" />
           </div>
-          <span className="font-heading text-lg font-bold text-foreground">NEPSE Sage</span>
+          <span className="font-heading text-lg font-bold text-foreground">NepseSage</span>
         </div>
 
         <div className="w-full max-w-[420px] animate-in fade-in slide-in-from-bottom-4 duration-500">

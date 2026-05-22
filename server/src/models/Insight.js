@@ -37,16 +37,25 @@ const insightSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    sector: {
+      type: String,
+      default: "Others",
+    },
     likes: {
       type: Number,
       default: 0,
     },
+    // Each entry is a user ID — uniqueness enforced in toggleLike logic
     likedBy: [
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
       },
     ],
+    commentCount: {
+      type: Number,
+      default: 0,
+    },
   },
   {
     timestamps: true,

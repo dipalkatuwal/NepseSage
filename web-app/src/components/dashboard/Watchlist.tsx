@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -23,6 +24,7 @@ import { nepseAPI, type MarketSymbol } from "@/lib/services";
 import { toast } from "sonner";
 
 export function Watchlist() {
+  const router = useRouter();
   const { user, updateProfileAPI } = useAuth();
 
   const [watchlistData, setWatchlistData] = useState<MarketSymbol[]>([]);
@@ -201,7 +203,10 @@ export function Watchlist() {
           ) : displayList.map((w) => (
             <HoverCard key={w.symbol} openDelay={200}>
               <HoverCardTrigger asChild>
-                <div className="flex items-center justify-between cursor-pointer group">
+                <div
+                  onClick={() => router.push(`/companyDetails/${w.symbol}`)}
+                  className="flex items-center justify-between cursor-pointer group"
+                >
                   <div>
                     <span className="font-heading text-sm font-bold group-hover:text-primary transition">
                       {w.symbol}

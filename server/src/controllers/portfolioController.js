@@ -105,6 +105,19 @@ export const addTransaction = async (req, res, next) => {
     portfolio.recalculate();
     await portfolio.save();
 
+    // Enrich ALL holdings with live LTP before returning so the client
+    // sees real P/L immediately without a page refresh.
+    const allSymbols = portfolio.holdings.map((h) => h.symbol);
+    if (allSymbols.length > 0) {
+      const liveData = await MarketData.find({ symbol: { $in: allSymbols } }).select("symbol ltp");
+      const liveMap = {};
+      liveData.forEach((m) => (liveMap[m.symbol] = m.ltp));
+      portfolio.holdings.forEach((h) => {
+        if (liveMap[h.symbol]) h.currentPrice = liveMap[h.symbol];
+      });
+      portfolio.recalculate();
+    }
+
     res.status(201).json(portfolio);
   } catch (error) {
     next(error);
@@ -181,6 +194,19 @@ export const addBulkTransactions = async (req, res, next) => {
 
     portfolio.recalculate();
     await portfolio.save();
+
+    // Enrich ALL holdings with live LTP before returning so the client
+    // sees real P/L immediately without a page refresh.
+    const enrichSymbols = portfolio.holdings.map((h) => h.symbol);
+    if (enrichSymbols.length > 0) {
+      const liveData = await MarketData.find({ symbol: { $in: enrichSymbols } }).select("symbol ltp");
+      const liveMap = {};
+      liveData.forEach((m) => (liveMap[m.symbol] = m.ltp));
+      portfolio.holdings.forEach((h) => {
+        if (liveMap[h.symbol]) h.currentPrice = liveMap[h.symbol];
+      });
+      portfolio.recalculate();
+    }
 
     res.status(201).json(portfolio);
   } catch (error) {

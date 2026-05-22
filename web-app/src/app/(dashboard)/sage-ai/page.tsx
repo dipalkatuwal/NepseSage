@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import SageAIClient from "./SageAIClient";
 
 export const metadata: Metadata = {
-  title: "Sage AI — NEPSE Sage AI",
+  title: "Sage AI — NepseSage",
   description: "AI-powered market analysis chat",
 };
 
