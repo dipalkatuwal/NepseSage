@@ -83,7 +83,6 @@ async function safeCall(label, fn) {
         return null;
       }
       const delay = BASE_DELAY_MS * Math.pow(2, attempt - 1);
-      console.warn(`⚠️  NepseFetcher [${label}] attempt ${attempt} failed, retrying in ${delay}ms…`);
       await sleep(delay);
     }
   }

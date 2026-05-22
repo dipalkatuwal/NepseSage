@@ -108,7 +108,6 @@ async function upsertSecurity(adaptedRow) {
 // ─── Full price sync ──────────────────────────────────────────────────────────
 
 export async function syncAllPrices() {
-  console.log("🔄 [SyncService] syncAllPrices — starting");
 
   const raw = await fetchAllSecurities();
   if (!raw || raw.length === 0) {
@@ -284,7 +283,6 @@ export async function appendIndexHistory() {
  * Safe to call multiple times — uses upsert so existing rows are never overwritten.
  */
 export async function backfillIndexHistory() {
-  console.log("🔄 [SyncService] backfillIndexHistory — fetching index daily graph...");
 
   const raw = await fetchNepseIndexGraph();
   if (!Array.isArray(raw) || raw.length === 0) {
@@ -400,14 +398,10 @@ const activeSyncs = new Map();
 
 export async function syncSymbolDetail(symbol) {
   const sym = symbol.toUpperCase().trim();
-  if (activeSyncs.has(sym)) {
-    console.log(`⏳ [SyncService] syncSymbolDetail — ${sym} already syncing`);
-    return activeSyncs.get(sym);
-  }
+  if (activeSyncs.has(sym)) return activeSyncs.get(sym);
 
   const syncPromise = (async () => {
     try {
-      console.log(`🔄 [SyncService] syncSymbolDetail — ${sym}`);
 
       const [rawDetail, rawGraph, rawPvHistory] = await Promise.all([
         fetchSecurityDetail(sym),
@@ -452,7 +446,7 @@ export async function syncSymbolDetail(symbol) {
         { upsert: true, returnDocument: "after" }
       );
 
-      console.log(`✅ [SyncService] syncSymbolDetail — ${sym} (${ohlcvHistory.length} OHLCV, ${pvHistory.length} PV)`);
+      // individual symbol logs suppressed — caller logs summary
       return doc;
     } catch (err) {
       console.error(`❌ [SyncService] syncSymbolDetail — ${sym}:`, err.message);
@@ -469,13 +463,15 @@ export async function syncSymbolDetail(symbol) {
 // ─── Priority history sync ────────────────────────────────────────────────────
 
 export async function syncPriorityHistories() {
-  console.log(`🔄 [SyncService] syncPriorityHistories — ${PRIORITY_SYMBOLS.length} symbols`);
+  let ok = 0, fail = 0;
   for (let i = 0; i < PRIORITY_SYMBOLS.length; i += HISTORY_BATCH_SIZE) {
     const batch = PRIORITY_SYMBOLS.slice(i, i + HISTORY_BATCH_SIZE);
-    await Promise.all(batch.map((sym) => syncSymbolDetail(sym).catch(() => null)));
+    const results = await Promise.allSettled(batch.map((sym) => syncSymbolDetail(sym)));
+    results.forEach((r) => (r.status === "fulfilled" && r.value ? ok++ : fail++));
     await sleep(INTER_BATCH_DELAY_MS);
   }
-  console.log("✅ [SyncService] syncPriorityHistories — complete");
+  const failNote = fail > 0 ? `, ${fail} failed` : "";
+  console.log(`✅ [SyncService] Priority histories — ${ok}/${PRIORITY_SYMBOLS.length} synced${failNote}`);
 }
 
 // ─── NEW: Full EOD history sync for ALL active symbols ────────────────────────
@@ -488,10 +484,8 @@ export async function syncPriorityHistories() {
  * @returns {{ synced: number, failed: number, skipped: number }}
  */
 export async function syncAllSymbolHistories() {
-  console.log("🔄 [SyncService] syncAllSymbolHistories — fetching all active symbols");
-
   const symbols = await MarketData.find({ isActive: true }).select("symbol").lean();
-  console.log(`📊 [SyncService] syncAllSymbolHistories — ${symbols.length} symbols to process`);
+  console.log(`🔄 [SyncService] Backfilling OHLCV for ${symbols.length} symbols...`);
 
   let synced = 0, failed = 0;
 
@@ -507,13 +501,14 @@ export async function syncAllSymbolHistories() {
 
     // Progress log every 50 symbols
     if ((i + HISTORY_BATCH_SIZE) % 50 === 0 || i + HISTORY_BATCH_SIZE >= symbols.length) {
-      console.log(`📊 [SyncService] syncAllSymbolHistories — ${Math.min(i + HISTORY_BATCH_SIZE, symbols.length)}/${symbols.length} processed`);
+      const done = Math.min(i + HISTORY_BATCH_SIZE, symbols.length);
+      console.log(`  ↳ OHLCV backfill ${done}/${symbols.length}`);
     }
 
     await sleep(INTER_BATCH_DELAY_MS);
   }
 
-  console.log(`✅ [SyncService] syncAllSymbolHistories — synced: ${synced}, failed: ${failed}`);
+  console.log(`✅ [SyncService] OHLCV backfill — ${synced} synced, ${failed} failed`);
   return { synced, failed };
 }
 
@@ -529,7 +524,6 @@ export async function syncAllSymbolHistories() {
  * @returns {{ computed: number, skipped: number }}
  */
 export async function syncTechnicals() {
-  console.log("🔄 [SyncService] syncTechnicals — pre-computing indicators");
 
   // Only fetch documents that have history
   const docs = await MarketData.find({
@@ -583,7 +577,6 @@ export async function syncTechnicals() {
 // ─── Company list seed ────────────────────────────────────────────────────────
 
 export async function seedCompanyMaster() {
-  console.log("📋 [SyncService] Syncing company master from NEPSE...");
 
   let rawList = await fetchCompanyList();
   if (!rawList || rawList.length === 0) {
@@ -595,7 +588,6 @@ export async function seedCompanyMaster() {
     return;
   }
 
-  console.log(`📋 [SyncService] Upserting ${rawList.length} companies...`);
   let inserted = 0;
 
   for (const co of rawList) {
