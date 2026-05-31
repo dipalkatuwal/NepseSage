@@ -6,7 +6,6 @@
 
 **NepseSage** transforms raw NEPSE market data into high-precision visual intelligence — combining institutional-grade market analytics, AI-powered insights, behavioral psychology tracking, and a risk-free trading simulator in a single, cohesive platform.
 
-[Live Demo](#) · [Report Bug](#) · [Request Feature](#)
 
 </div>
 
@@ -76,7 +75,7 @@ Professional-grade charting and indicator data.
 - Index history with configurable range (1M, 3M, 1Y, ALL) and advance/decline breadth series.
 
 ### 🤖 Sage AI
-OpenAI-powered market intelligence, contextualized for NEPSE.
+Groq-powered market intelligence (Llama 3.3 70B), contextualized for NEPSE.
 - **Symbol Analyzer**: Input a ticker (e.g., `NICA`, `NTC`) and receive a structured technical + sentiment breakdown.
 - **AI Chat**: Conversational interface for open-ended market questions.
 - **Market Sentiment**: Aggregates NEPSE-wide sentiment signals.
@@ -150,9 +149,9 @@ NepseSage follows a **monorepo** structure separating concerns between a REST AP
 └─────────────────────────────────────────────────────────────┘
                            │
                            ▼
-              ┌────────────────────────┐
-              │   OpenAI API (GPT-4)   │
-              └────────────────────────┘
+              ┌─────────────────────────┐
+              │  Groq API (Llama 3.3)   │
+              └─────────────────────────┘
 ```
 
 ---
@@ -185,7 +184,7 @@ NepseSage follows a **monorepo** structure separating concerns between a REST AP
 | Database | MongoDB + Mongoose ODM | 9 |
 | Authentication | JSON Web Tokens (JWT) | 9 |
 | Password Hashing | Bcryptjs | 3 |
-| AI Integration | OpenAI SDK | 6 |
+| AI Integration | Groq SDK (Llama 3.3 70B) | Latest |
 | NEPSE Data | @rumess/nepse-api | 1 |
 | Scheduler | node-cron | 4 |
 | Validation | Zod | 4 |
@@ -204,7 +203,7 @@ NepseSage/
 │   │   │   └── db.js                # MongoDB connection (Mongoose)
 │   │   │
 │   │   ├── controllers/             # Business logic, request/response handlers
-│   │   │   ├── aiController.js      # OpenAI — stock analysis, chat, sentiment
+│   │   │   ├── aiController.js      # Groq — stock analysis, chat, sentiment
 │   │   │   ├── authController.js    # Register, login, profile, plan management
 │   │   │   ├── insightController.js # Community insights CRUD, likes, comments
 │   │   │   ├── journalController.js # Trade journal entries, discipline, bias stats
@@ -315,126 +314,6 @@ NepseSage/
     ├── next.config.js
     ├── tailwind.config.ts
     └── package.json
-```
-
----
-
-## Getting Started
-
-### Prerequisites
-
-Ensure the following are installed on your machine:
-
-- **Node.js** v20 or higher — [Download](https://nodejs.org/)
-- **npm** v10 or higher (bundled with Node.js)
-- **MongoDB** — Either a local instance or a [MongoDB Atlas](https://www.mongodb.com/atlas) cluster (free tier works)
-- **OpenAI API Key** — [Get one here](https://platform.openai.com/api-keys)
-- **Git**
-
-### Installation
-
-**1. Clone the repository**
-
-```bash
-git clone https://github.com/your-username/NepseSage.git
-cd NepseSage
-```
-
-**2. Install backend dependencies**
-
-```bash
-cd server
-npm install
-```
-
-**3. Install frontend dependencies**
-
-```bash
-cd ../web-app
-npm install
-```
-
-### Environment Variables
-
-> ⚠️ **Security Warning**: Never commit your `.env` files to version control. They are already listed in `.gitignore`.
-
-**Backend — `server/.env`**
-
-Create the file at `server/.env`:
-
-```env
-# Server
-PORT=5000
-
-# Database
-MONGODB_URI=mongodb+srv://<username>:<password>@cluster0.xxxxx.mongodb.net/nepsesage
-
-# Authentication
-JWT_SECRET=your_strong_random_secret_here_at_least_64_chars
-
-# AI
-OPENAI_API_KEY=sk-proj-...
-
-# CORS — URL of your frontend
-CLIENT_URL=http://localhost:3000
-```
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `PORT` | No | Server port. Defaults to `5000`. |
-| `MONGODB_URI` | **Yes** | MongoDB connection string. |
-| `JWT_SECRET` | **Yes** | Secret for signing JWTs. Use a long, random string. |
-| `OPENAI_API_KEY` | **Yes** | Your OpenAI API key (GPT-4 access recommended). |
-| `CLIENT_URL` | No | Frontend origin for CORS. Defaults to `http://localhost:3000`. |
-
-**Frontend — `web-app/.env.local`**
-
-Create the file at `web-app/.env.local`:
-
-```env
-NEXT_PUBLIC_API_URL=http://localhost:5000/api
-```
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `NEXT_PUBLIC_API_URL` | **Yes** | Full base URL of the backend API. |
-
-### Running the Application
-
-You need **two terminal instances** running simultaneously.
-
-**Terminal 1 — Backend Server**
-
-```bash
-cd server
-npm run dev
-```
-
-The server starts on `http://localhost:5000`. You should see:
-
-```
-⏰ [Scheduler] NEPSE pipeline scheduler v2 initialized
-🚀 NepseSage server running on port 5000
-```
-
-On first startup, the data pipeline automatically seeds the company master list and syncs the latest market prices.
-
-**Terminal 2 — Frontend Application**
-
-```bash
-cd web-app
-npm run dev
-```
-
-The web app starts on `http://localhost:3000`. Open this in your browser.
-
-**Health Check**
-
-Verify the backend is running correctly:
-
-```bash
-curl http://localhost:5000/api/health
-# {"status":"ok","timestamp":"2026-05-22T..."}
 ```
 
 ---
