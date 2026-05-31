@@ -88,9 +88,7 @@ function SectorCard({ sector }: { sector: SectorData }) {
                         {sector.symbolCount} listed · Rs.{turnoverCr}Cr
                     </p>
                 </div>
-                <span
-                    className={`font-heading text-sm font-bold shrink-0 ml-2 ${positive ? "positive" : "negative"}`}
-                >
+                <span className={`font-heading text-sm font-bold shrink-0 ml-2 ${positive ? "positive" : "negative"}`}>
                     {positive ? "+" : ""}{sector.avgChange.toFixed(2)}%
                 </span>
             </div>
@@ -110,23 +108,55 @@ function SectorCard({ sector }: { sector: SectorData }) {
     );
 }
 
+// ─── Market closed banner ─────────────────────────────────────────────────────
+
+function MarketClosedBanner({ asOf }: { asOf?: string | null }) {
+    const label = asOf
+        ? `Last session: ${new Date(asOf).toLocaleDateString("en-NP", {
+              weekday: "short",
+              month: "short",
+              day: "numeric",
+          })}`
+        : "Last session data";
+
+    return (
+        <div className="flex items-center gap-2 rounded-md bg-muted/50 border border-border px-3 py-2">
+            {/* Pulsing dot — grey when closed */}
+            <span className="relative flex h-2 w-2 shrink-0">
+                <span className="block h-2 w-2 rounded-full bg-muted-foreground/40" />
+            </span>
+            <p className="text-[11px] text-muted-foreground font-heading">
+                Market closed &middot; {label}
+            </p>
+        </div>
+    );
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export function SectorPerformance() {
-    const { sectors, loading } = useNepse();
+    const { sectors, summary, loading } = useNepse();
 
-    // Filter out non-equity sectors (Corporate Debenture, Preference Share, Promoter Share, Mutual Fund)
+    // Filter out non-equity sectors
     const NON_EQUITY_SECTORS = [
         "Corporate Debenture",
         "Preference Share",
         "Promoter Share",
         "Mutual Fund",
-        "Unknown"
+        "Unknown",
     ];
     const clean = sectors.filter(
         (s) => s._id && !NON_EQUITY_SECTORS.includes(s._id) && s.symbolCount > 0
     );
     const sorted = [...clean].sort((a, b) => b.avgChange - a.avgChange);
+
+    // Detect market-closed state:
+    // Either the summary says market is closed, or every sector has zero
+    // volume activity (no gainers, no losers, all avgChange === 0).
+    const allZero =
+        sorted.length > 0 &&
+        sorted.every((s) => s.avgChange === 0 && s.gainers === 0 && s.losers === 0);
+    const marketClosed = !summary?.isMarketOpen || allZero;
 
     const best  = sorted.length > 0 ? sorted[0] : null;
     const worst = sorted.length > 0 ? sorted[sorted.length - 1] : null;
@@ -150,7 +180,9 @@ export function SectorPerformance() {
                     <div>
                         <CardTitle className="clinical-label">Sector Performance</CardTitle>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                            Today&apos;s avg change by sector · {sorted.length} sectors
+                            {marketClosed
+                                ? `Showing last session · ${sorted.length} sectors`
+                                : `Today's avg change by sector · ${sorted.length} sectors`}
                         </p>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
@@ -172,60 +204,72 @@ export function SectorPerformance() {
                         )}
                     </div>
                 </div>
+
+                {/* Market closed banner — shown only when applicable */}
+                {marketClosed && (
+                    <div className="mt-3">
+                        <MarketClosedBanner asOf={summary?.marketAsOf} />
+                    </div>
+                )}
             </CardHeader>
 
             <CardContent className="px-5 pb-5 pt-0 space-y-6">
-                {/* Bar chart with short labels */}
-                <ResponsiveContainer width="100%" height={200}>
-                    <BarChart
-                        data={chartData}
-                        margin={{ top: 4, right: 4, left: -20, bottom: 40 }}
-                        barSize={18}
-                    >
-                        <CartesianGrid
-                            strokeDasharray="3 3"
-                            stroke="var(--color-border)"
-                            horizontal
-                            vertical={false}
-                        />
-                        <XAxis
-                            dataKey="label"
-                            tick={{
-                                fontSize: 9,
-                                fontFamily: "var(--font-heading)",
-                                fill: "var(--color-muted-foreground)",
-                            }}
-                            axisLine={false}
-                            tickLine={false}
-                            angle={-35}
-                            textAnchor="end"
-                            interval={0}
-                        />
-                        <YAxis
-                            tick={{
-                                fontSize: 9,
-                                fontFamily: "var(--font-heading)",
-                                fill: "var(--color-muted-foreground)",
-                            }}
-                            axisLine={false}
-                            tickLine={false}
-                            tickFormatter={(v) => `${v > 0 ? "+" : ""}${v.toFixed(1)}%`}
-                        />
-                        <Tooltip content={<ChartTooltip />} cursor={{ fill: "var(--color-secondary)" }} />
-                        <ReferenceLine y={0} stroke="var(--color-border)" strokeWidth={1.5} />
-                        <Bar dataKey="avgChange" radius={[3, 3, 0, 0]}>
-                            {chartData.map((s) => (
-                                <Cell
-                                    key={s._id}
-                                    fill={s.avgChange >= 0 ? "var(--color-success)" : "var(--color-destructive)"}
-                                    fillOpacity={0.8}
-                                />
-                            ))}
-                        </Bar>
-                    </BarChart>
-                </ResponsiveContainer>
+                {/* Bar chart */}
+                <div>
+                    <ResponsiveContainer width="100%" height={200}>
+                        <BarChart
+                            data={chartData}
+                            margin={{ top: 4, right: 4, left: -20, bottom: 40 }}
+                            barSize={18}
+                        >
+                            <CartesianGrid
+                                strokeDasharray="3 3"
+                                stroke="var(--color-border)"
+                                horizontal
+                                vertical={false}
+                            />
+                            <XAxis
+                                dataKey="label"
+                                tick={{
+                                    fontSize: 9,
+                                    fontFamily: "var(--font-heading)",
+                                    fill: "var(--color-muted-foreground)",
+                                }}
+                                axisLine={false}
+                                tickLine={false}
+                                angle={-35}
+                                textAnchor="end"
+                                interval={0}
+                            />
+                            <YAxis
+                                tick={{
+                                    fontSize: 9,
+                                    fontFamily: "var(--font-heading)",
+                                    fill: "var(--color-muted-foreground)",
+                                }}
+                                axisLine={false}
+                                tickLine={false}
+                                tickFormatter={(v) => `${v > 0 ? "+" : ""}${v.toFixed(1)}%`}
+                            />
+                            <Tooltip
+                                content={<ChartTooltip />}
+                                cursor={{ fill: "var(--color-secondary)" }}
+                            />
+                            <ReferenceLine y={0} stroke="var(--color-border)" strokeWidth={1.5} />
+                            <Bar dataKey="avgChange" radius={[3, 3, 0, 0]}>
+                                {chartData.map((s) => (
+                                    <Cell
+                                        key={s._id}
+                                        fill={s.avgChange >= 0 ? "var(--color-success)" : "var(--color-destructive)"}
+                                        fillOpacity={0.8}
+                                    />
+                                ))}
+                            </Bar>
+                        </BarChart>
+                    </ResponsiveContainer>
+                </div>
 
-                {/* Sector grid — one card per official sector with live data */}
+                {/* Sector grid */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
                     {sorted.map((s) => (
                         <SectorCard key={s._id} sector={s} />

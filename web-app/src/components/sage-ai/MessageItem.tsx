@@ -1,83 +1,173 @@
 "use client";
 
-import { Copy, RefreshCw, ThumbsUp, ChevronDown } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
+import { Copy, RefreshCw, ThumbsUp } from "lucide-react";
+import { motion } from "framer-motion";
+import { useState } from "react";
 
 interface MessageItemProps {
   msg: {
     type: string;
     text: string;
     time: string;
-    chart?: boolean;
-    analysis?: string;
+    streaming?: boolean;
   };
 }
 
+function renderInline(text: string): React.ReactNode {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((part, i) =>
+    part.startsWith("**") && part.endsWith("**")
+      ? <strong key={i} className="font-semibold text-foreground">{part.slice(2, -2)}</strong>
+      : part
+  );
+}
+
+function renderMarkdown(text: string) {
+  const lines = text.split("\n");
+  const elements: React.ReactNode[] = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    if (!line.trim()) {
+      i++;
+      continue;
+    }
+
+    if (line.startsWith("### ")) {
+      elements.push(<h3 key={i} className="text-base font-semibold text-foreground mt-5 mb-2">{line.slice(4)}</h3>);
+    } else if (line.startsWith("## ")) {
+      elements.push(<h2 key={i} className="text-lg font-semibold text-foreground mt-6 mb-2">{line.slice(3)}</h2>);
+    } else if (line.startsWith("# ")) {
+      elements.push(<h1 key={i} className="text-xl font-bold text-foreground mt-6 mb-3">{line.slice(2)}</h1>);
+    } else if (line.match(/^\d+\.\s/)) {
+      // numbered list — collect group
+      const items: string[] = [];
+      while (i < lines.length && lines[i].match(/^\d+\.\s/)) {
+        items.push(lines[i].replace(/^\d+\.\s/, ""));
+        i++;
+      }
+      elements.push(
+        <ol key={`ol-${i}`} className="space-y-2 my-3 ml-1">
+          {items.map((b, j) => (
+            <li key={j} className="flex gap-3 text-[15px] text-foreground/85 leading-relaxed">
+              <span className="shrink-0 font-medium text-foreground/40 w-5 text-right">{j + 1}.</span>
+              <span>{renderInline(b)}</span>
+            </li>
+          ))}
+        </ol>
+      );
+      continue;
+    } else if (line.startsWith("- ") || line.startsWith("* ")) {
+      const items: string[] = [];
+      while (i < lines.length && (lines[i].startsWith("- ") || lines[i].startsWith("* "))) {
+        items.push(lines[i].slice(2));
+        i++;
+      }
+      elements.push(
+        <ul key={`ul-${i}`} className="space-y-2 my-3 ml-1">
+          {items.map((b, j) => (
+            <li key={j} className="flex gap-3 text-[15px] text-foreground/85 leading-relaxed">
+              <span className="shrink-0 text-foreground/30 mt-2 h-1.5 w-1.5 rounded-full bg-current" />
+              <span>{renderInline(b)}</span>
+            </li>
+          ))}
+        </ul>
+      );
+      continue;
+    } else if (line.startsWith("---") || line.startsWith("***")) {
+      elements.push(<hr key={i} className="border-border/40 my-4" />);
+    } else {
+      elements.push(
+        <p key={i} className="text-[15px] text-foreground/85 leading-[1.75] my-2">
+          {renderInline(line)}
+        </p>
+      );
+    }
+    i++;
+  }
+
+  return elements;
+}
+
 export function MessageItem({ msg }: MessageItemProps) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(msg.text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  if (msg.type === "user") {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.2 }}
+        className="flex justify-end"
+      >
+        <div className="max-w-[80%] bg-secondary rounded-3xl px-5 py-3.5">
+          <p className="text-[15px] text-foreground leading-relaxed">{msg.text}</p>
+        </div>
+      </motion.div>
+    );
+  }
+
   return (
-    <div className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"} w-full`}>
-      {msg.type === "ai" && (
-        <div className="mr-4 mt-1 flex-shrink-0">
-          <div className="h-9 w-9 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center">
-            <span className="text-primary text-xs">🤖</span>
-          </div>
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2 }}
+      className="group"
+    >
+      {/* Streaming dots */}
+      {msg.streaming && !msg.text && (
+        <div className="flex items-center gap-1 py-3">
+          {[0, 1, 2].map((i) => (
+            <motion.div
+              key={i}
+              className="h-2 w-2 rounded-full bg-foreground/30"
+              animate={{ opacity: [0.3, 1, 0.3] }}
+              transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.2 }}
+            />
+          ))}
         </div>
       )}
-      <div className={`max-w-[85%] ${msg.type === "user" ? "bg-secondary/40 rounded-3xl px-5 py-3 shadow-sm border border-border/10" : "flex-1 space-y-3"}`}>
-        <p className="text-[15px] leading-[1.65] text-foreground/90 font-normal">{msg.text}</p>
 
-        {msg.chart && (
-          <Collapsible defaultOpen className="space-y-2">
-            <CollapsibleTrigger asChild>
-              <Button variant="outline" size="sm" className="h-8 text-[11px] w-full justify-between hover:bg-secondary/50 border-primary/20 text-muted-foreground tracking-widest uppercase font-bold rounded-xl">
-                <span>Analysis Insights</span>
-                <ChevronDown className="h-4 w-4" />
-              </Button>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <Card className="rounded-2xl border border-border/50 bg-card/10 backdrop-blur-sm shadow-none overflow-hidden">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-[11px] clinical-label uppercase tracking-widest font-black">Clinical Indicators</span>
-                    <span className="positive text-[11px] font-black px-3 py-1 bg-emerald-500/10 rounded-full">Bullish Momentum</span>
-                  </div>
-                  <div className="flex items-end gap-1.5 h-16 mb-3">
-                    {[30, 40, 35, 45, 25, 20, 15, 10, 5, 8, 12, 60].map((h, j) => (
-                      <div
-                        key={j}
-                        className="flex-1 rounded-sm transition-all"
-                        style={{
-                          height: `${h}%`,
-                          backgroundColor: j < 6 ? "var(--color-destructive)" : j < 9 ? "var(--color-muted)" : "var(--color-primary)",
-                        }}
-                      />
-                    ))}
-                  </div>
-                  <p className="text-[13px] text-foreground/70 pt-3 border-t border-border/20 font-light leading-relaxed">
-                    {msg.analysis}
-                  </p>
-                </CardContent>
-              </Card>
-            </CollapsibleContent>
-          </Collapsible>
-        )}
+      {/* Message content */}
+      {msg.text && (
+        <div className="prose-sm max-w-none">
+          {renderMarkdown(msg.text)}
+          {msg.streaming && (
+            <motion.span
+              className="inline-block w-0.5 h-4 bg-foreground/60 ml-0.5 align-middle"
+              animate={{ opacity: [1, 0] }}
+              transition={{ duration: 0.5, repeat: Infinity }}
+            />
+          )}
+        </div>
+      )}
 
-        {msg.type === "ai" && (
-          <div className="flex items-center gap-5 mt-2">
-            <button className="text-[11px] text-muted-foreground/50 hover:text-primary transition-colors flex items-center gap-1.5">
-              <Copy className="h-3.5 w-3.5" /> Copy
-            </button>
-            <button className="text-[11px] text-muted-foreground/50 hover:text-primary transition-colors flex items-center gap-1.5">
-              <RefreshCw className="h-3.5 w-3.5" /> Retry
-            </button>
-            <button className="text-[11px] text-muted-foreground/50 hover:text-primary transition-colors">
-              <ThumbsUp className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
+      {/* Action row */}
+      {!msg.streaming && msg.text && (
+        <div className="flex items-center gap-1 mt-3 -ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+          <button
+            onClick={handleCopy}
+            className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[12px] text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors"
+          >
+            <Copy className="h-3.5 w-3.5" />
+            {copied ? "Copied!" : "Copy"}
+          </button>
+          <button className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[12px] text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors">
+            <RefreshCw className="h-3.5 w-3.5" /> Retry
+          </button>
+          <button className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[12px] text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors">
+            <ThumbsUp className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+    </motion.div>
   );
 }

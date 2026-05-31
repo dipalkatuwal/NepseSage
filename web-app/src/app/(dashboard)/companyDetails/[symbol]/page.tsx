@@ -1,23 +1,19 @@
 "use client";
  
-import { useState, useEffect, use, useRef } from "react";
+import { useState, useEffect, use } from "react";
 import Link from "next/link";
 import { useSymbolDetail } from "@/hooks/useNepse";
-import { nepseAPI, aiAPI, type TechnicalAnalysis, type MarketSymbol } from "@/lib/services";
+import { nepseAPI, type TechnicalAnalysis, type MarketSymbol } from "@/lib/services";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   ArrowLeft,
   TrendingUp,
   TrendingDown,
-  Sparkles,
   Activity,
-  Send,
-  Brain,
   Info,
   HelpCircle,
 } from "lucide-react";
@@ -121,52 +117,7 @@ function formatBoldText(text: string) {
   });
 }
  
-function parseCustomMarkdown(text: string) {
-  if (!text) return null;
-  const blocks = text.split("\n");
-  return blocks.map((block, idx) => {
-    const trimmed = block.trim();
-    if (!trimmed) return <div key={idx} className="h-2" />;
- 
-    if (trimmed.startsWith("###")) {
-      return (
-        <h4 key={idx} className="text-sm font-heading font-bold text-primary mt-4 mb-2 flex items-center gap-1.5">
-          <Sparkles className="w-3.5 h-3.5 text-primary animate-pulse" />
-          {trimmed.replace("###", "").trim()}
-        </h4>
-      );
-    }
-    if (trimmed.startsWith("##")) {
-      return (
-        <h3 key={idx} className="text-base font-heading font-bold text-foreground mt-5 mb-2.5 border-b border-border/30 pb-1">
-          {trimmed.replace("##", "").trim()}
-        </h3>
-      );
-    }
-    if (trimmed.startsWith("#")) {
-      return (
-        <h2 key={idx} className="text-lg font-heading font-bold text-foreground mt-6 mb-3">
-          {trimmed.replace("#", "").trim()}
-        </h2>
-      );
-    }
- 
-    if (trimmed.startsWith("-") || trimmed.startsWith("*")) {
-      return (
-        <li key={idx} className="text-sm text-muted-foreground ml-4 list-disc py-0.5">
-          {formatBoldText(trimmed.substring(1).trim())}
-        </li>
-      );
-    }
- 
-    return (
-      <p key={idx} className="text-sm text-muted-foreground leading-relaxed mb-2.5">
-        {formatBoldText(trimmed)}
-      </p>
-    );
-  });
-}
- 
+
 interface ExtendedMarketSymbol extends MarketSymbol {
   open?: number;
   high?: number;
@@ -202,12 +153,6 @@ export default function CompanyDetailsPage({ params }: PageProps) {
   // Chart states
   const [timeRange, setTimeRange] = useState<"7D" | "30D" | "90D">("90D");
  
-  // Sage AI states
-  const [aiReport, setAiReport] = useState("");
-  const [aiLoading, setAiLoading] = useState(false);
-  const [customQuestion, setCustomQuestion] = useState("");
-  const reportEndRef = useRef<HTMLDivElement>(null);
- 
   // Fetch technical data on mount
   useEffect(() => {
     let mounted = true;
@@ -237,34 +182,6 @@ export default function CompanyDetailsPage({ params }: PageProps) {
       mounted = false;
     };
   }, [symbol]);
- 
-  // Scroll to bottom of AI log when streaming updates
-  useEffect(() => {
-    if (aiLoading) {
-      reportEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [aiReport, aiLoading]);
- 
-  // Generator logic for SSE streams
-  const handleGenerateReport = async (question?: string) => {
-    setAiLoading(true);
-    if (!question) {
-      setAiReport("");
-    } else {
-      setAiReport((prev) => prev + `\n\n---\n\n### Query: ${question}\n\n`);
-    }
- 
-    try {
-      const generator = aiAPI.analyzeStock(symbol, question);
-      for await (const chunk of generator) {
-        setAiReport((prev) => prev + chunk);
-      }
-    } catch {
-      setAiReport((prev) => prev + "\n\n*Error: Unable to stream from Sage AI. Please try again.*");
-    } finally {
-      setAiLoading(false);
-    }
-  };
  
   // Merge history (OHLC) and pvHistory (volume/turnover) by date
   const unifiedDataMap = new Map();
@@ -810,74 +727,6 @@ export default function CompanyDetailsPage({ params }: PageProps) {
         </div>
       </div>
  
-      {/* SAGE AI CLINICAL REPORT SECTION */}
-      <Card className="card-clinical border-border/40 shadow-none relative overflow-hidden bg-background/40">
-        <CardHeader className="flex flex-row items-center justify-between border-b border-border/40 p-5 pb-3 flex-wrap gap-2">
-          <div className="flex items-center gap-2">
-            <Brain className="w-5 h-5 text-primary animate-pulse" />
-            <div>
-              <CardTitle className="text-base font-semibold">Sage AI Diagnostic Assistant</CardTitle>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Generate dynamic real-time evaluations using indicators, averages, and clinical trends
-              </p>
-            </div>
-          </div>
-          <Button
-            size="sm"
-            onClick={() => handleGenerateReport()}
-            disabled={aiLoading}
-            className="bg-primary/20 text-primary border border-primary/30 hover:bg-primary/35 transition gap-1.5 h-8 text-xs font-semibold px-3.5 rounded-lg"
-          >
-            <Sparkles className="w-3.5 h-3.5 animate-spin" style={{ animationDuration: "3s" }} />
-            {aiLoading ? "Consulting..." : "Generate AI Diagnostic"}
-          </Button>
-        </CardHeader>
- 
-        <CardContent className="p-5 space-y-4">
-          <div className="min-h-[160px] max-h-[350px] overflow-y-auto bg-black/25 rounded-lg p-4 border border-border/40 select-text">
-            {aiReport ? (
-              <div className="space-y-1">
-                {parseCustomMarkdown(aiReport)}
-                <div ref={reportEndRef} />
-              </div>
-            ) : (
-              <div className="h-[120px] flex flex-col justify-center items-center text-muted-foreground/60 text-xs">
-                <Brain className="w-8 h-8 opacity-40 mb-2" />
-                No diagnostics requested yet. Click 'Generate AI Diagnostic' or submit a custom prompt below.
-              </div>
-            )}
-          </div>
- 
-          {/* CUSTOM PROMPT CHAT INPUT */}
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (!customQuestion.trim() || aiLoading) return;
-              const q = customQuestion;
-              setCustomQuestion("");
-              handleGenerateReport(q);
-            }}
-            className="flex gap-2 items-center"
-          >
-            <Input
-              type="text"
-              placeholder={`Ask Sage AI anything about ${symbol} (e.g., Is it a good buy right now?)`}
-              value={customQuestion}
-              onChange={(e) => setCustomQuestion(e.target.value)}
-              disabled={aiLoading}
-              className="bg-background/50 border-border/50 text-sm focus-visible:ring-1 focus-visible:ring-ring flex-1 h-9 rounded-lg"
-            />
-            <Button
-              type="submit"
-              disabled={aiLoading || !customQuestion.trim()}
-              size="icon"
-              className="h-9 w-9 bg-primary hover:bg-primary/90 transition text-primary-foreground rounded-lg"
-            >
-              <Send className="w-4 h-4" />
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
     </div>
   );
 }

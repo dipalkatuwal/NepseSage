@@ -5,6 +5,7 @@ import {
   Bot,
   LineChart,
   Trophy,
+  TrendingUp,
 } from "lucide-react";
 
 export type NavAccess = "public" | "user" | "pro";
@@ -17,6 +18,7 @@ export interface NavItem {
 }
 
 export const navItems: NavItem[] = [
+  { label: "Market",      icon: TrendingUp,      to: "/market",     access: "public" },
   { label: "Dashboard",   icon: LayoutDashboard, to: "/",           access: "user"   },
   { label: "Insights",    icon: Sparkles,        to: "/insights",   access: "user"   },
   { label: "Journal",     icon: BookOpen,        to: "/journal",    access: "user"   },

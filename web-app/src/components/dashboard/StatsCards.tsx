@@ -68,12 +68,12 @@ export function StatsCards() {
 
   if (loading) {
     return (
-      <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="mb-6 grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[...Array(4)].map((_, i) => (
           <Card key={i} className="card-clinical p-0 shadow-none">
-            <CardContent className="p-5">
-              <Skeleton className="h-3 w-24 mb-3" />
-              <Skeleton className="h-7 w-32" />
+            <CardContent className="p-4">
+              <Skeleton className="h-3 w-20 mb-2" />
+              <Skeleton className="h-6 w-28" />
             </CardContent>
           </Card>
         ))}
@@ -82,29 +82,24 @@ export function StatsCards() {
   }
 
   return (
-    <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="mb-6 grid grid-cols-2 lg:grid-cols-4 gap-3">
       {statsData.map((s) => (
         <Card key={s.label} className="card-clinical p-0 shadow-none">
-          <CardContent className="p-5 pb-5">
-            <p className="clinical-label">{s.label}</p>
-            <div className="mt-2 flex items-end justify-between">
-              <span className="stat-value text-xl">{s.value}</span>
-              {s.change && (
-                <span
-                  className={`text-sm font-semibold ${s.positive ? "positive" : "negative"}`}
-                >
-                  {s.change}
-                </span>
-              )}
-              {s.isWarning && (
-                <AlertTriangle className="h-4 w-4 text-warning" />
-              )}
+          <CardContent className="p-4">
+            <p className="clinical-label text-[10px]">{s.label}</p>
+            <div className="mt-1.5 flex items-end justify-between gap-1">
+              <span className="stat-value text-lg leading-tight">{s.value}</span>
+              <div className="flex flex-col items-end shrink-0">
+                {s.change && (
+                  <span className={`text-xs font-semibold ${s.positive ? "positive" : "negative"}`}>
+                    {s.change}
+                  </span>
+                )}
+                {s.isWarning && <AlertTriangle className="h-3.5 w-3.5 text-warning" />}
+              </div>
             </div>
             {"isScore" in s && s.isScore && (
-              <Progress
-                value={s.scoreValue}
-                className="h-1.5 mt-2 bg-secondary"
-              />
+              <Progress value={s.scoreValue} className="h-1 mt-2 bg-secondary" />
             )}
           </CardContent>
         </Card>

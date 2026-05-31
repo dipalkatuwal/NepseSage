@@ -1,10 +1,16 @@
 /**
  * ╔══════════════════════════════════════════════════════════════════╗
- * ║              NepseSage — NEPSE Sync Service  v2                  ║
+ * ║              NepseSage — NEPSE Sync Service  v3                  ║
  * ║  Orchestrates the full pipeline:                                 ║
  * ║    Fetcher → Adapter → MongoDB upsert                            ║
  * ║                                                                  ║
- * ║  v2 upgrades:                                                    ║
+ * ║  v3 upgrades:                                                    ║
+ * ║  • getLastTradingDay()        — NST-aware last trading day calc  ║
+ * ║  • eodSnapshotNeeded()        — checks DB vs last trading day    ║
+ * ║  • runEODSnapshotIfNeeded()   — visitor-triggered EOD sync       ║
+ * ║    Called from nepseController on every page load when market    ║
+ * ║    is closed. Force-writes all fields (ignores volume=0 guard).  ║
+ * ║    Uses in-memory lock to prevent concurrent runs.               ║
  * ║  • appendIndexHistory() — accumulates IndexHistory daily rows    ║
  * ║  • syncTechnicals()     — pre-computes & stores all indicators   ║
  * ║  • mergeTurnoverIntoOHLCV() — unifies pvHistory into ohlcvHistory║
@@ -62,6 +68,226 @@ function todayUTC() {
   const d = new Date();
   d.setUTCHours(0, 0, 0, 0);
   return d;
+}
+
+// ─── Trading day helpers ──────────────────────────────────────────────────────
+
+/**
+ * Returns the most recent completed NEPSE trading day as a UTC midnight Date.
+ *
+ * Uses UTC dates throughout — consistent with how IndexHistory rows are keyed
+ * (appendIndexHistory uses todayUTC). Nepal is UTC+5:45 but since the EOD
+ * cron fires at 15:30 NST = 09:45 UTC, the UTC date is always the same
+ * calendar day as NST when writing EOD data.
+ *
+ * Rules:
+ *  • Trading days: Monday–Friday
+ *  • If today (UTC) is a trading day AND UTC time is past 09:45 (= 15:30 NST) → today
+ *  • Otherwise → walk backwards to the last Mon–Fri
+ *
+ * @returns {Date} UTC midnight of the last completed trading day
+ */
+export function getLastTradingDay() {
+  const now = new Date();
+  const utcHour = now.getUTCHours() + now.getUTCMinutes() / 60;
+  const EOD_UTC = 9 + 45 / 60; // 09:45 UTC = 15:30 NST
+
+  const utcDay = now.getUTCDay(); // 0=Sun,1=Mon,...,6=Sat
+  const isTradingDay = utcDay >= 1 && utcDay <= 5; // Mon–Fri
+
+  const candidate = new Date(now);
+  candidate.setUTCHours(0, 0, 0, 0);
+
+  if (isTradingDay && utcHour >= EOD_UTC) {
+    return candidate; // today's session is done
+  }
+
+  // Walk backwards to find the last completed trading day
+  const back = new Date(candidate);
+  back.setUTCDate(back.getUTCDate() - 1);
+
+  for (let i = 0; i < 7; i++) {
+    const dow = back.getUTCDay();
+    if (dow >= 1 && dow <= 5) return back;
+    back.setUTCDate(back.getUTCDate() - 1);
+  }
+
+  // Fallback (should never reach here)
+  const yesterday = new Date();
+  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+  yesterday.setUTCHours(0, 0, 0, 0);
+  return yesterday;
+}
+
+/**
+ * Returns true if the DB's last EOD snapshot is NOT from the last trading day,
+ * meaning we need to fetch and store fresh EOD data.
+ *
+ * Checks IndexSnapshot.savedAt — that document is always written at EOD.
+ * Falls back to MarketData.lastUpdated if IndexSnapshot is missing.
+ *
+ * @returns {Promise<boolean>}
+ */
+export async function eodSnapshotNeeded() {
+  try {
+    const lastTradingDay = getLastTradingDay();
+
+    // Check IndexSnapshot first — it's the most reliable EOD timestamp
+    const snap = await IndexSnapshot.findOne({ key: "NEPSE" }).select("savedAt").lean();
+    const savedAt = snap?.savedAt ? new Date(snap.savedAt) : null;
+
+    if (savedAt) {
+      // Normalize savedAt to UTC midnight for comparison
+      const savedDay = new Date(savedAt);
+      savedDay.setUTCHours(0, 0, 0, 0);
+      const needed = savedDay.getTime() < lastTradingDay.getTime();
+      return needed;
+    }
+
+    // IndexSnapshot missing — fall back to MarketData
+    const latest = await MarketData.findOne({ isActive: true, ltp: { $gt: 0 } })
+      .sort({ lastUpdated: -1 })
+      .select("lastUpdated")
+      .lean();
+
+    if (!latest) return true; // Empty DB — always fetch
+
+    const lastUpdatedDay = new Date(latest.lastUpdated);
+    lastUpdatedDay.setUTCHours(0, 0, 0, 0);
+    return lastUpdatedDay.getTime() < lastTradingDay.getTime();
+  } catch (err) {
+    console.warn("⚠️  [EOD Check] eodSnapshotNeeded error:", err.message);
+    return false; // Don't trigger on error — avoid hammering NEPSE API
+  }
+}
+
+// ─── EOD snapshot lock (prevents concurrent visitor-triggered syncs) ───────────
+
+let _eodSyncInProgress = false;
+
+/**
+ * Visitor-triggered EOD snapshot.
+ *
+ * Called from nepseController on every page load when:
+ *   1. The market is confirmed closed
+ *   2. eodSnapshotNeeded() returns true
+ *
+ * Force-writes ALL fields regardless of the volume=0 guard that
+ * upsertSecurity() normally applies. This ensures post-close data
+ * is always written correctly even when NEPSE returns volume=0.
+ *
+ * Runs async — does NOT block the HTTP response. The first visitor
+ * triggers the sync; subsequent visitors during the sync are skipped
+ * via the in-memory lock flag.
+ *
+ * @returns {void}  (fire-and-forget)
+ */
+export function runEODSnapshotIfNeeded() {
+  // Fire-and-forget wrapper — never awaited by the controller
+  _runEODSnapshot().catch((err) =>
+    console.error("❌ [EOD Snapshot] Unhandled error:", err.message)
+  );
+}
+
+async function _runEODSnapshot() {
+  if (_eodSyncInProgress) {
+    console.log("⏳ [EOD Snapshot] Already in progress — skipping duplicate trigger");
+    return;
+  }
+
+  const needed = await eodSnapshotNeeded();
+  if (!needed) return;
+
+  _eodSyncInProgress = true;
+  console.log("📸 [EOD Snapshot] Starting visitor-triggered EOD sync...");
+
+  try {
+    // 1. Fetch all securities and FORCE-WRITE (bypass volume=0 guard)
+    const raw = await fetchAllSecurities();
+    let breadth = { gainers: 0, losers: 0, unchanged: 0 };
+
+    if (raw && raw.length > 0) {
+      let synced = 0;
+
+      // Compute breadth from the raw API data BEFORE writing to DB.
+      // After close, NEPSE still returns the session's final changePercent values
+      // even though volume may be 0. We count only symbols that traded (volume > 0).
+      for (const row of raw) {
+        const adapted = adaptSecurityRow(row);
+        if (!adapted?.symbol) continue;
+        if ((adapted.volume || 0) > 0) {
+          if ((adapted.changePercent || 0) > 0)      breadth.gainers++;
+          else if ((adapted.changePercent || 0) < 0) breadth.losers++;
+          else                                        breadth.unchanged++;
+        }
+      }
+
+      // Now force-write all fields — no volume=0 skip at EOD
+      for (const row of raw) {
+        try {
+          const adapted = adaptSecurityRow(row);
+          if (!adapted?.symbol) continue;
+          await MarketData.findOneAndUpdate(
+            { symbol: adapted.symbol },
+            {
+              $set: {
+                ...adapted,
+                lastUpdated: new Date(),
+              },
+            },
+            { upsert: true }
+          );
+          synced++;
+        } catch (err) {
+          console.warn(`⚠️  [EOD Snapshot] upsert failed ${row?.symbol}:`, err.message);
+        }
+      }
+      console.log(`✅ [EOD Snapshot] Force-wrote ${synced} securities | Breadth: +${breadth.gainers} -${breadth.losers} =${breadth.unchanged}`);
+    }
+
+    // 2. Fetch and save index snapshot (force-write turnover/volume too)
+    const rawIndex = await fetchNepseIndex();
+    if (rawIndex) {
+      const adapted = adaptMarketIndex(rawIndex);
+      if (adapted) {
+        await IndexSnapshot.findOneAndUpdate(
+          { key: "NEPSE" },
+          {
+            $set: {
+              key:               "NEPSE",
+              nepseIndex:        adapted.nepseIndex,
+              change:            adapted.change,
+              changePercent:     adapted.changePercent,
+              turnover:          adapted.turnover,          // force-write even if 0
+              totalVolume:       adapted.totalVolume,       // force-write even if 0
+              totalTransactions: adapted.totalTransactions,
+              asOf:              adapted.asOf,
+              savedAt:           new Date(),
+            },
+          },
+          { upsert: true }
+        );
+        console.log(`✅ [EOD Snapshot] Index snapshot saved: ${adapted.nepseIndex}`);
+      }
+    }
+
+    // 3. Append today's row to IndexHistory using the pre-computed breadth
+    // so gainers/losers are correct even after MarketData volume is zeroed.
+    await appendIndexHistory(breadth);
+
+    // 4. Backfill any missing historical rows (e.g. fresh DB, new install)
+    const indexHistoryCount = await IndexHistory.countDocuments();
+    if (indexHistoryCount < 30) {
+      console.log(`📅 [EOD Snapshot] IndexHistory thin (${indexHistoryCount} rows) — running backfill...`);
+      await backfillIndexHistory();
+    }
+
+    console.log("✅ [EOD Snapshot] Visitor-triggered EOD sync complete");
+  } catch (err) {
+    console.error("❌ [EOD Snapshot] Failed:", err.message);
+  } finally {
+    _eodSyncInProgress = false;
+  }
 }
 
 // ─── Core upsert ──────────────────────────────────────────────────────────────
@@ -222,14 +448,15 @@ export async function syncIndexSnapshot() {
 /**
  * Saves today's CONFIRMED end-of-day index data to IndexHistory.
  *
- * ONLY called from the 15:30 NPT EOD cron — never from startup.
- * This guarantees the row always contains the real closing value,
- * not a mid-session or stale snapshot.
+ * Called from:
+ *  - The 15:30 NPT EOD cron (scheduler)
+ *  - _runEODSnapshot() visitor-triggered sync
  *
- * Advance/decline counts are read from MarketData at the same moment,
- * so they reflect the final session breadth.
+ * @param {object} [breadthOverride] - Optional { gainers, losers, unchanged }
+ *   computed from the raw security data before volume was zeroed.
+ *   When omitted, counts are read live from MarketData (fine during cron).
  */
-export async function appendIndexHistory() {
+export async function appendIndexHistory(breadthOverride) {
   const raw = await fetchNepseIndex();
   if (!raw) {
     console.warn("⚠️  [SyncService] appendIndexHistory — no index data");
@@ -239,14 +466,22 @@ export async function appendIndexHistory() {
   const adapted = adaptMarketIndex(raw);
   if (!adapted) return null;
 
-  // Real A/D/U from the live MarketData collection (no extra API call)
-  // Only include companies that were actually traded (volume > 0) to avoid stale/delisted data
-  const [gainers, losers, unchanged] = await Promise.all([
-    MarketData.countDocuments({ isActive: true, volume: { $gt: 0 }, changePercent: { $gt: 0 } }),
-    MarketData.countDocuments({ isActive: true, volume: { $gt: 0 }, changePercent: { $lt: 0 } }),
-    MarketData.countDocuments({ isActive: true, volume: { $gt: 0 }, changePercent: 0 }),
-  ]);
+  let gainers, losers, unchanged;
 
+  if (breadthOverride) {
+    // Use pre-computed breadth — avoids reading zeroed MarketData post-close
+    ({ gainers, losers, unchanged } = breadthOverride);
+  } else {
+    // Read from live MarketData (correct during the 15:30 cron, before volume is zeroed)
+    [gainers, losers, unchanged] = await Promise.all([
+      MarketData.countDocuments({ isActive: true, volume: { $gt: 0 }, changePercent: { $gt: 0 } }),
+      MarketData.countDocuments({ isActive: true, volume: { $gt: 0 }, changePercent: { $lt: 0 } }),
+      MarketData.countDocuments({ isActive: true, volume: { $gt: 0 }, changePercent: 0 }),
+    ]);
+  }
+
+  // Use UTC midnight as the date key — consistent with all existing rows in the DB
+  // and with how backfillIndexHistory() parses NEPSE's date strings.
   const today = todayUTC();
 
   const doc = await IndexHistory.findOneAndUpdate(
@@ -302,7 +537,7 @@ export async function backfillIndexHistory() {
       date.setUTCHours(0, 0, 0, 0);
       if (isNaN(date.getTime())) { skipped++; continue; }
 
-      // Skip today — today's row must only come from the confirmed EOD cron
+      // Skip today — today's row must only come from the confirmed EOD cron / visitor snapshot
       const todayMidnight = todayUTC();
       if (date.getTime() === todayMidnight.getTime()) { skipped++; continue; }
 
@@ -629,10 +864,11 @@ export async function seedCompanyMaster() {
 // ─── Full startup sync — rate-limited ─────────────────────────────────────────
 
 /**
- * Returns the number of NEPSE trading days (Sun–Thu) that have passed
+ * Returns the number of NEPSE trading days (Mon–Fri) that have passed
  * since the given date, not counting today.
  *
  * Used to detect how many sessions were missed while the server was down.
+ * Updated to Mon–Fri schedule (NEPSE changed from Sun–Thu in 2023).
  */
 function missedTradingDays(sinceDate) {
   const MS_PER_DAY = 1000 * 60 * 60 * 24;
@@ -645,7 +881,7 @@ function missedTradingDays(sinceDate) {
   cursor.setUTCDate(cursor.getUTCDate() + 1); // start from the day AFTER last sync
   while (cursor < todayUTCMidnight) {
     const dow = cursor.getUTCDay(); // 0=Sun,1=Mon,...,6=Sat
-    if (dow >= 0 && dow <= 4) count++; // NEPSE: Sun(0)–Thu(4)
+    if (dow >= 1 && dow <= 5) count++; // NEPSE: Mon(1)–Fri(5)
     cursor.setTime(cursor.getTime() + MS_PER_DAY);
   }
   return count;
@@ -727,13 +963,31 @@ export async function runStartupSync() {
       console.log("⏸️  [SyncService] Skipping syncAllPrices — market closed, existing prices are valid");
     }
 
-    // ── Step 3: Backfill any missed trading days ──────────────────────────────
-    if (dbState.missedDays > 0) {
-      console.log(`📅 [SyncService] Backfilling ${dbState.missedDays} missed trading day(s)...`);
-      await syncAllSymbolHistories();   // OHLCV candles from getSecurityDailyGraph()
+    // ── Step 3: Backfill IndexHistory if thin or missed days ─────────────────
+    //
+    // Run backfillIndexHistory() whenever:
+    //   a) Trading days were missed (server was down), OR
+    //   b) IndexHistory has fewer than 30 rows — means this is a fresh DB or
+    //      the history was never properly populated. The NEPSE graph API
+    //      returns ~365 days of data so we can fill it all at once.
+    //
+    // This is the primary reason the chart shows only 2 days on a new install:
+    // appendIndexHistory() only writes today's row; backfill covers the rest.
+    const indexHistoryCount = await IndexHistory.countDocuments();
+    const needsHistoryBackfill = dbState.missedDays > 0 || indexHistoryCount < 30;
+
+    if (needsHistoryBackfill) {
+      console.log(`📅 [SyncService] IndexHistory has ${indexHistoryCount} rows, missed ${dbState.missedDays} trading day(s) — running backfill...`);
       await backfillIndexHistory();     // Index rows from getNepseIndexDailyGraph()
+      console.log("✅ [SyncService] IndexHistory backfill complete");
+    }
+
+    // Only run the heavy OHLCV + technicals sync when days were actually missed
+    if (dbState.missedDays > 0) {
+      console.log(`📅 [SyncService] Backfilling ${dbState.missedDays} missed trading day(s) of OHLCV + technicals...`);
+      await syncAllSymbolHistories();   // OHLCV candles from getSecurityDailyGraph()
       await syncTechnicals();           // Recompute RSI/MACD/BB from restored data
-      console.log("✅ [SyncService] Backfill complete");
+      console.log("✅ [SyncService] OHLCV + technicals backfill complete");
     }
 
     // ── Step 4: Priority histories ────────────────────────────────────────────

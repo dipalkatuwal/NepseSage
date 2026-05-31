@@ -21,6 +21,7 @@ import { analyzeSymbol, computeChartSeries } from "../services/technicalAnalysis
 import {
   syncSymbolDetail,
   getMarketOpenStatus,
+  runEODSnapshotIfNeeded,
 } from "../pipeline/nepseSyncService.js";
 import {
   adaptFloorsheet,
@@ -111,6 +112,14 @@ export const getSummary = async (req, res, next) => {
       IndexSnapshot.findOne({ key: "NEPSE" }),
       getMarketOpenStatus(),
     ]);
+
+    // ── Visitor-triggered EOD snapshot ────────────────────────────────────────
+    // If the market is closed and our DB is behind the last trading day,
+    // kick off a background sync. This is fire-and-forget — the response
+    // is served immediately from what's in the DB right now.
+    if (!(statusRaw?.isOpen)) {
+      runEODSnapshotIfNeeded();
+    }
 
     // Only count companies actually traded (volume > 0) for correct breadth
     const tradedDocs = allDocs.filter((r) => (r.volume || 0) > 0);
@@ -450,7 +459,11 @@ export const getIndexHistory = async (req, res, next) => {
       .select("date nepseIndex change changePercent turnover gainers losers")
       .lean();
 
-    if (dbHistory.length > 0) {
+    // Serve from DB only when we have a reasonable number of rows relative
+    // to what was requested. If the DB is thin (fresh install, never backfilled),
+    // fall through to the live NEPSE API so the chart always shows something.
+    const minExpected = Math.min(days, 5); // at least 5 rows, or fewer if range is tiny
+    if (dbHistory.length >= minExpected) {
       const formatted = dbHistory.map((row) => ({
         time:          row.date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "2-digit" }),
         date:          row.date,
@@ -464,7 +477,7 @@ export const getIndexHistory = async (req, res, next) => {
       return res.json(formatted);
     }
 
-    console.warn("[getIndexHistory] DB has no history rows — falling back to live API");
+    console.warn(`[getIndexHistory] DB has only ${dbHistory.length} rows (need ${minExpected}) — falling back to live API`);
     const raw = await fetchNepseIndexGraph();
     if (!raw || !Array.isArray(raw)) return res.json([]);
 
@@ -519,6 +532,13 @@ export const getIndexBreadth = async (req, res, next) => {
 export const getMarketStatus = async (req, res, next) => {
   try {
     const status = await getMarketOpenStatus();
+
+    // ── Visitor-triggered EOD snapshot ────────────────────────────────────────
+    // Fire-and-forget: if market is closed and DB is stale, sync in background.
+    if (!(status?.isOpen)) {
+      runEODSnapshotIfNeeded();
+    }
+
     res.json(status ?? { isOpen: false, asOf: null });
   } catch (error) {
     next(error);

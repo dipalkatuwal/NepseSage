@@ -20,8 +20,12 @@ import { navItems } from "./nav-data";
 
 export function AppSidebar() {
   const pathname = usePathname();
-  const { state } = useSidebar();
+  const { state, isMobile, setOpenMobile } = useSidebar();
   const { isAuthenticated, user } = useAuth();
+
+  const closeMobileSidebar = () => {
+    if (isMobile) setOpenMobile(false);
+  };
 
   const isPro = user?.plan === "pro";
 
@@ -30,7 +34,7 @@ export function AppSidebar() {
       <SidebarHeader className="h-16 flex flex-row items-center justify-between px-4">
         {state === "expanded" && (
           <div className="flex flex-col">
-            <Link href={isAuthenticated ? "/" : "/market"} className="font-heading text-lg font-bold text-primary hover:opacity-80 transition-opacity">
+            <Link href={isAuthenticated ? "/" : "/market"} className="font-heading text-lg font-bold text-primary hover:opacity-80 transition-opacity" onClick={closeMobileSidebar}>
               NepseSage
             </Link>
             
@@ -78,7 +82,7 @@ export function AppSidebar() {
                     isLocked ? "opacity-50" : ""
                   }`}
                 >
-                  <Link href={href} className="flex items-center justify-between w-full">
+                  <Link href={href} className="flex items-center justify-between w-full" onClick={closeMobileSidebar}>
                     <div className="flex items-center gap-2">
                       <item.icon className="h-4 w-4 shrink-0" />
                       <span>{item.label}</span>
@@ -98,7 +102,7 @@ export function AppSidebar() {
             <p className="clinical-label mb-2">
               {isAuthenticated ? "Sage Insight" : "Pro Account"}
             </p>
-            <Link href="/upgrade">
+            <Link href="/upgrade" onClick={closeMobileSidebar}>
               <Button variant="clinical" size="sm" className="w-full">
                 <Zap className="mr-1.5 h-3 w-3" />
                 {isAuthenticated ? "Upgrade to Pro" : "Get Pro Access"}
@@ -109,7 +113,7 @@ export function AppSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild tooltip="Support" className="nav-item border-none h-10">
-              <Link href="/settings?tab=Support" className="flex items-center gap-2">
+              <Link href="/settings?tab=Support" className="flex items-center gap-2" onClick={closeMobileSidebar}>
                 <HelpCircle className="h-4 w-4 shrink-0" />
                 <span>Support</span>
               </Link>

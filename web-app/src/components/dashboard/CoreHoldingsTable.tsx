@@ -457,7 +457,7 @@ export function CoreHoldingsTable() {
   return (
     <>
     <Card className="card-clinical p-0 shadow-none overflow-hidden">
-      <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 pb-0 gap-3 sm:gap-0">
+      <CardHeader className="flex flex-row items-center justify-between p-4 pb-0">
         <CardTitle className="clinical-label text-sm">Core Holdings</CardTitle>
         <div className="flex gap-2">
           <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) resetImport(); }}>

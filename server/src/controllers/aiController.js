@@ -1,22 +1,15 @@
-import OpenAI from "openai";
+import Groq from "groq-sdk";
 import MarketData from "../models/MarketData.js";
 import JournalEntry from "../models/JournalEntry.js";
 import { analyzeSymbol } from "../services/technicalAnalysis.js";
 
-/**
- * SAFE OpenAI initializer (prevents env timing bugs)
- */
-const getOpenAI = () => {
-  const key = process.env.OPENAI_API_KEY;
-
-  if (!key) {
-    throw new Error("OPENAI_API_KEY is missing");
-  }
-
-  return new OpenAI({ apiKey: key });
+const getGroq = () => {
+  const key = process.env.GROQ_API_KEY;
+  if (!key) throw new Error("GROQ_API_KEY is missing");
+  return new Groq({ apiKey: key });
 };
 
-const MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
+const MODEL = "llama-3.3-70b-versatile";
 
 const SAGE_SYSTEM_PROMPT = `You are NepseSage, an elite financial analyst specializing exclusively in the Nepal Stock Exchange (NEPSE). 
 
@@ -38,8 +31,6 @@ Important disclaimers: Always note that this is analysis, not financial advice. 
 // 📊 Analyze Stock (STREAMING)
 // ============================
 export const analyzeStock = async (req, res) => {
-  const openai = getOpenAI();
-
   const { symbol, question } = req.body;
 
   const marketData = await MarketData.findOne({
@@ -82,7 +73,8 @@ TECHNICAL INDICATORS:
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
 
-    const stream = await openai.chat.completions.create({
+    const groq = getGroq();
+    const stream = await groq.chat.completions.create({
       model: MODEL,
       messages: [
         { role: "system", content: SAGE_SYSTEM_PROMPT },
@@ -94,9 +86,7 @@ TECHNICAL INDICATORS:
 
     for await (const chunk of stream) {
       const text = chunk.choices?.[0]?.delta?.content;
-      if (text) {
-        res.write(`data: ${JSON.stringify({ text })}\n\n`);
-      }
+      if (text) res.write(`data: ${JSON.stringify({ text })}\n\n`);
     }
 
     res.write("data: [DONE]\n\n");
@@ -114,8 +104,6 @@ TECHNICAL INDICATORS:
 // 💬 Chat
 // ============================
 export const chat = async (req, res) => {
-  const openai = getOpenAI();
-
   const { messages, symbol, context } = req.body;
 
   let systemContext = SAGE_SYSTEM_PROMPT;
@@ -143,7 +131,8 @@ Signal: ${technical.signal}`;
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
 
-    const stream = await openai.chat.completions.create({
+    const groq = getGroq();
+    const stream = await groq.chat.completions.create({
       model: MODEL,
       messages: [
         { role: "system", content: systemContext },
@@ -155,9 +144,7 @@ Signal: ${technical.signal}`;
 
     for await (const chunk of stream) {
       const text = chunk.choices?.[0]?.delta?.content;
-      if (text) {
-        res.write(`data: ${JSON.stringify({ text })}\n\n`);
-      }
+      if (text) res.write(`data: ${JSON.stringify({ text })}\n\n`);
     }
 
     res.write("data: [DONE]\n\n");
@@ -175,8 +162,6 @@ Signal: ${technical.signal}`;
 // 📓 Journal Analysis
 // ============================
 export const analyzeJournalEntry = async (req, res) => {
-  const openai = getOpenAI();
-
   const { entryId } = req.body;
 
   const entry = await JournalEntry.findOne({
@@ -200,7 +185,8 @@ Biases: ${entry.detectedBiases.join(", ") || "None"}
 Provide behavioral insights and improvements.`;
 
   try {
-    const response = await openai.chat.completions.create({
+    const groq = getGroq();
+    const response = await groq.chat.completions.create({
       model: MODEL,
       messages: [
         { role: "system", content: SAGE_SYSTEM_PROMPT },
@@ -211,9 +197,7 @@ Provide behavioral insights and improvements.`;
 
     const analysis = response.choices[0].message.content;
 
-    await JournalEntry.findByIdAndUpdate(entryId, {
-      aiAnalysis: analysis,
-    });
+    await JournalEntry.findByIdAndUpdate(entryId, { aiAnalysis: analysis });
 
     res.json({ analysis });
   } catch (err) {

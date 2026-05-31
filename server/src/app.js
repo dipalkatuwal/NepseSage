@@ -1,6 +1,8 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
 import { connectDB } from "./config/db.js";
 import { errorHandler, notFound } from "./middleware/errorMiddleware.js";
 
@@ -19,7 +21,6 @@ import leaderboardRoutes from "./routes/leaderboardRoutes.js";
 // nepseSyncService → nepseFetcher → nepseAdapter → MongoDB
 import "./pipeline/nepseScheduler.js";
 
-dotenv.config();
 connectDB();
 
 const app = express();

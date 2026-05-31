@@ -114,9 +114,11 @@ function getCards(isNew: boolean, name: string): NotifCard[] {
 function NotifCard({
   card,
   onDismiss,
+  onNavigate,
 }: {
   card: NotifCard;
   onDismiss: (id: string) => void;
+  onNavigate: () => void;
 }) {
   const router = useRouter();
   const Icon = card.icon;
@@ -153,7 +155,7 @@ function NotifCard({
 
           {card.action && (
             <button
-              onClick={() => router.push(card.action!.href)}
+              onClick={() => { router.push(card.action!.href); onNavigate(); }}
               className="flex items-center gap-0.5 mt-2.5 text-[11px] font-semibold text-primary hover:underline"
             >
               {card.action.label}
@@ -229,7 +231,7 @@ export function NotificationSheet() {
             </div>
           ) : (
             visible.map((card) => (
-              <NotifCard key={card.id} card={card} onDismiss={dismiss} />
+              <NotifCard key={card.id} card={card} onDismiss={dismiss} onNavigate={() => setOpen(false)} />
             ))
           )}
         </div>
@@ -238,7 +240,7 @@ export function NotificationSheet() {
         <div className="shrink-0 border-t border-border px-4 pt-3 pb-4">
           {isGuest && (
             <p className="text-[11px] text-center text-muted-foreground mb-3">
-              <a href="/login" className="text-primary hover:underline font-semibold">
+              <a href="/login" onClick={() => setOpen(false)} className="text-primary hover:underline font-semibold">
                 Sign in
               </a>{" "}
               to get personalised notifications.

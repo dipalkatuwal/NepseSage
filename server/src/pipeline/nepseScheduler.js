@@ -1,13 +1,13 @@
 /**
  * ╔══════════════════════════════════════════════════════════════════╗
- * ║              NepseSage — NEPSE Scheduler  v3                     ║
+ * ║              NepseSage — NEPSE Scheduler  v4                     ║
  * ║                                                                  ║
  * ║  NEPSE Trading Hours (Nepal Time = UTC+5:45):                    ║
- * ║    Sunday – Thursday, 11:00 AM – 3:00 PM NPT                    ║
+ * ║    Monday – Friday, 11:00 AM – 3:00 PM NPT                      ║
  * ║                                                                  ║
  * ║  Rules:                                                          ║
  * ║  • appendIndexHistory() ONLY called at EOD (15:30 NPT cron)     ║
- * ║    Never on startup — must always contain confirmed close data   ║
+ * ║    and via visitor-triggered runEODSnapshotIfNeeded()            ║
  * ║  • syncIndexSnapshot() only runs during market hours             ║
  * ║  • Missed days backfilled automatically on startup               ║
  * ╚══════════════════════════════════════════════════════════════════╝
@@ -31,10 +31,10 @@ import {
 
 setTimeout(runStartupSync, 3000);
 
-// ─── Every 5 min during market hours (11:00–15:00 NPT, Sun–Thu) ──────────────
+// ─── Every 5 min during market hours (11:00–15:00 NPT, Mon–Fri) ──────────────
 
 cron.schedule(
-  "*/5 11-15 * * 0-4",
+  "*/5 11-15 * * 1-5",
   async () => {
     await syncAllPrices();
     await syncIndexSnapshot();
@@ -43,16 +43,16 @@ cron.schedule(
   { timezone: "Asia/Kathmandu" }
 );
 
-// ─── Pre-market warmup (10:50 NPT) ───────────────────────────────────────────
+// ─── Pre-market warmup (10:50 NPT, Mon–Fri) ───────────────────────────────────
 // Ensures DB cache is warm before the first 5-min tick fires.
 
 cron.schedule(
-  "50 10 * * 0-4",
+  "50 10 * * 1-5",
   () => syncAllPrices(),
   { timezone: "Asia/Kathmandu" }
 );
 
-// ─── End-of-day snapshot (15:30 NPT) ─────────────────────────────────────────
+// ─── End-of-day snapshot (15:30 NPT, Mon–Fri) ────────────────────────────────
 // Full pipeline after market close.
 //
 // ORDER MATTERS:
@@ -67,7 +67,7 @@ cron.schedule(
 //   6. seedCompanyMaster() — refresh metadata (new listings, delists)
 
 cron.schedule(
-  "30 15 * * 0-4",
+  "30 15 * * 1-5",
   async () => {
     console.log("📅 [Scheduler] EOD sync starting...");
     try {
@@ -94,12 +94,12 @@ cron.schedule(
   { timezone: "Asia/Kathmandu" }
 );
 
-// ─── Weekly metadata deep refresh (Sunday 10:30 NPT) ─────────────────────────
+// ─── Weekly metadata deep refresh (Monday 10:30 NPT) ─────────────────────────
 // Runs once a week before the market opens to catch any new listings or
 // regulatory body / sector changes that might not appear in the daily seed.
 
 cron.schedule(
-  "30 10 * * 0",
+  "30 10 * * 1",
   async () => {
     console.log("📅 [Scheduler] Weekly metadata refresh...");
     await seedCompanyMaster();
@@ -107,4 +107,4 @@ cron.schedule(
   { timezone: "Asia/Kathmandu" }
 );
 
-console.log("⏰ [Scheduler] NEPSE pipeline scheduler v2 initialized");
+console.log("⏰ [Scheduler] NEPSE pipeline scheduler v4 initialized (Mon–Fri)");

@@ -72,7 +72,7 @@ export function Navbar() {
         {!isSearchExpanded && (
           <Link
             href={isAuthenticated ? "/" : "/market"}
-            className="hidden font-heading text-primary font-semibold text-muted-foreground sm:inline-block hover:text-foreground transition-colors"
+            className="font-heading text-primary font-semibold hover:text-primary/80 transition-colors"
           >
             NepseSage
           </Link>
@@ -82,20 +82,7 @@ export function Navbar() {
 
       {!isSearchExpanded && (
         <div className="flex items-center gap-1 md:gap-2">
-          <nav className="flex items-center gap-1">
-            <Link
-              href="/market"
-              className={`rounded px-3 py-1.5 text-xs font-medium transition hover:text-foreground ${
-                pathname === "/market" ||
-                pathname === "/sectors" ||
-                pathname === "/companies"
-                  ? "text-primary"
-                  : "text-muted-foreground"
-              }`}
-            >
-              Market
-            </Link>
-          </nav>
+         
 
           <div className="ml-2 flex items-center gap-1 md:gap-3">
             {!isLoading && isAuthenticated && <NotificationSheet />}
@@ -270,8 +257,8 @@ export function Navbar() {
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <div className="flex items-center gap-2 ml-2">
-                <Link href="/login">
+              <div className="flex items-center gap-1.5 ml-1">
+                <Link href="/login" className="hidden sm:block">
                   <Button
                     variant="ghost"
                     size="sm"
@@ -283,7 +270,7 @@ export function Navbar() {
                 <Link href="/signup">
                   <Button
                     size="sm"
-                    className="text-xs font-bold bg-primary text-primary-foreground hover:bg-primary/90 h-8"
+                    className="text-xs font-bold bg-primary text-primary-foreground hover:bg-primary/90 h-8 px-3"
                   >
                     Get Started
                   </Button>

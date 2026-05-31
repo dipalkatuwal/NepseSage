@@ -84,7 +84,6 @@ export function MarketChart() {
             const raw = await nepseAPI.getIndexHistory(selectedRange);
             if (Array.isArray(raw) && raw.length > 0) {
                 setHistory(raw);
-                // If data has changePercent/gainers fields it came from our DB
                 setDataSource(raw[0].changePercent !== undefined ? "db" : "live");
             } else {
                 setHistory([]);
@@ -112,7 +111,6 @@ export function MarketChart() {
 
     const strokeColor = isPositive ? "var(--color-success)" : "var(--color-destructive)";
 
-    // Thin ticks for large datasets
     const tickInterval = history.length > 60 ? Math.floor(history.length / 8) : 0;
 
     const subtitleText = loading
@@ -151,9 +149,9 @@ export function MarketChart() {
 
             <CardContent className="px-2 pb-5 pt-0">
                 {loading ? (
-                    <Skeleton className="h-[220px] w-full rounded-md" />
+                    <Skeleton className="h-[300px] w-full rounded-md" />
                 ) : history.length === 0 ? (
-                    <div className="h-[220px] flex flex-col items-center justify-center gap-2 text-xs text-muted-foreground">
+                    <div className="h-[300px] flex flex-col items-center justify-center gap-2 text-xs text-muted-foreground">
                         <span>{error ?? "No index history available yet."}</span>
                         {!error && (
                             <span className="text-[10px] opacity-60">
@@ -162,7 +160,7 @@ export function MarketChart() {
                         )}
                     </div>
                 ) : (
-                    <ResponsiveContainer width="100%" height={220}>
+                    <ResponsiveContainer width="100%" height={300}>
                         <AreaChart
                             data={history}
                             margin={{ top: 4, right: 12, left: 0, bottom: 0 }}
